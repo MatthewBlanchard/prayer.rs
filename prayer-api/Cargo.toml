@@ -1,0 +1,29 @@
+[package]
+name = "prayer-api"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+prayer-runtime = { path = "../prayer-runtime" }
+axum.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+parking_lot.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+reqwest.workspace = true
+
+[dev-dependencies]
+tower = "0.5"
+http-body-util = "0.1"
+async-trait.workspace = true

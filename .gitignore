@@ -1,0 +1,35 @@
+# Rust build output
+/target/
+
+# Node / TypeScript client
+/prayer-mcp-client-ts/node_modules/
+/prayer-mcp-client-ts/dist/
+
+# Logs
+/logs/
+*.log
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Claw / Codex
+.claw/
+.codex
+.config/
+
+# Claude Code sandbox
+.sandbox-home/
+.sandbox-tmp/
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,29 @@
+[package]
+name = "prayer-mcp"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "MCP server that proxies LLM requests through prayer-api into SpaceMolt"
+
+[lints]
+workspace = true
+
+[dependencies]
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+reqwest.workspace = true
+clap.workspace = true
+rmcp.workspace = true
+regex.workspace = true
+globset.workspace = true
+chrono.workspace = true
+anyhow.workspace = true
+parking_lot.workspace = true
+axum.workspace = true
+prayer-runtime = { path = "../prayer-runtime" }
