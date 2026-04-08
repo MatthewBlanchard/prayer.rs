@@ -120,6 +120,36 @@ Engine state is fully serializable. Multi-turn commands (`mine`, `go`, `refuel`,
 | `prayer-runtime` | DSL parser, analyzer, execution engine, transport trait, game state model |
 | `prayer-api` | Axum HTTP server, session management, SpaceMolt auth integration |
 | `prayer-compat-adapter` | Thin shim for legacy clients on `/compat/v1/*` |
+| `prayer-mcp` | MCP server that proxies Prayer API calls and exposes EffectiveState as a virtual filesystem (VFS) |
+
+---
+
+## MCP and VFS
+
+`prayer-mcp` is the MCP entry point for LLM clients. It connects to `prayer-api`, manages sessions/scripts, and exposes a deterministic virtual filesystem projection of runtime state so agents can inspect game context without calling SpaceMolt directly.
+
+The VFS is session-scoped and queryable with MCP tools:
+
+- `fs_ls` to list directories
+- `fs_read` to read one virtual file
+- `fs_query` for pipeline-style search (`find`, `grep`, `read`, `project`, `sort`, `unique`, `limit`)
+
+High-signal paths currently include:
+
+- `/status.json`
+- `/context.json`
+- `/missions/active.json` and `/missions/available.json`
+- `/ship/ship.json` and `/ship/cargo.jsonl`
+- `/market/station_market.json` and `/market/orders/*.jsonl`
+- `/storage/items.jsonl`
+- `/systems/index.json` and `/systems/{id}.json`
+- `/catalog/**` and `/exploration/**`
+- `/station/context.json`
+
+The full mapping target and current implementation notes are documented in:
+
+- `docs/game-state-vfs-mapping.md`
+- `docs/prayer-mcp-virtual-filesystem-plan.md`
 
 ---
 
