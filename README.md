@@ -306,16 +306,6 @@ LOCAL_AUTH_BYPASS=1     Skip SpaceMolt auth (local dev only)
 
 ---
 
-## Known limitations and bugs
-
-**`MINED` / `STASHED` predicates always return 0** — predicates currently read per-turn delta fields that are never populated. The session accumulators inside the engine are correct but not yet wired into `GameState` before each tick. Scripts using `until MINED(carbon_ore) > 5` will not behave as expected.
-
-**No authentication or authorization** — prayer.rs is scoped to trusted/internal deployments. Do not expose to untrusted networks without adding an auth layer.
-
-**API pre-stable** — endpoint shapes and DTO fields may change. Pin client and server to the same commit.
-
----
-
 ## Provenance
 
 This runtime was built with Claude (Anthropic) as an active collaborator throughout — architecture, implementation, and this document. Claude was used for design discussion, code generation, review, and documentation. The pipeline design, DSL semantics, and tradeoff decisions (including why a custom command language rather than embedded Lua) were worked out in conversation with Claude and reflect deliberate choices, not defaults.
