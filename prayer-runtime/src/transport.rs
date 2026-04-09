@@ -572,7 +572,7 @@ fn map_command_spec(action: &str) -> Result<CommandSpecMap, TransportError> {
         }),
         // C# implements these as richer multi-step/high-level operations.
         "go" | "mine" | "explore" | "buy" | "sell" | "cancel_buy" | "cancel_sell" | "retrieve"
-        | "stash" | "wait" | "set_home" | "refuel" => {
+        | "stash" | "wait" | "set_home" | "refuel" | "jettison" => {
             Err(TransportError::UnsupportedCommand(format!(
             "{action} requires command-engine orchestration (C#-style multi-step/high-level behavior)"
         )))

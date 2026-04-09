@@ -136,6 +136,7 @@ Current built-in commands:
 - `cancel_sell <item>`
 - `retrieve <item> [quantity]`
 - `stash [item]`
+- `jettison [item]`
 - `switch_ship <ship>`
 - `install_mod <mod>`
 - `uninstall_mod <mod>`

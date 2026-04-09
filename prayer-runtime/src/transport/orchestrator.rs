@@ -29,6 +29,7 @@ impl SpaceMoltTransport {
             "sell" => Ok(Some(self.handle_sell(command, runtime_state).await?)),
             "cancel_buy" => Ok(Some(self.handle_cancel_buy(command, runtime_state).await?)),
             "cancel_sell" => Ok(Some(self.handle_cancel_sell(command, runtime_state).await?)),
+            "jettison" => Ok(Some(self.handle_jettison(command, runtime_state).await?)),
             _ => Ok(None),
         }
     }
@@ -561,6 +562,54 @@ impl SpaceMoltTransport {
         let item_id = required_text_arg(command, 0, "cancel_sell")?;
         let result = cancel_orders_for_item(self, item_id, state.own_sell_orders.as_ref()).await?;
         Ok(completed_with_message(result))
+    }
+
+    async fn handle_jettison(
+        &self,
+        command: &EngineCommand,
+        runtime_state: Option<&GameState>,
+    ) -> Result<EngineExecutionResult, TransportError> {
+        let state = required_runtime_state(runtime_state, "jettison")?;
+
+        if let Some(item_id) = command_arg_text_at(command, 0) {
+            let quantity = state.cargo.get(item_id).copied().unwrap_or(0);
+            if quantity <= 0 {
+                return Ok(completed_with_message(format!("No {item_id} in cargo.")));
+            }
+            let value = self
+                .execute_api(
+                    "jettison",
+                    Some(serde_json::json!({ "item_id": item_id, "quantity": quantity })),
+                )
+                .await?;
+            return Ok(completed_with_api_message(&value));
+        }
+
+        let targets = sell_targets_for_all_cargo(&state.cargo, |_| true);
+        if targets.is_empty() {
+            return Ok(completed_with_message("No cargo to jettison."));
+        }
+        let mut jettisoned_count = 0usize;
+        let mut last_message = None;
+        for (item_id, qty) in targets {
+            let value = self
+                .execute_api(
+                    "jettison",
+                    Some(serde_json::json!({ "item_id": item_id, "quantity": qty })),
+                )
+                .await?;
+            last_message = extract_result_message(&value);
+            if has_error_payload(&value) {
+                return Ok(completed_with_message(format!(
+                    "Jettison stopped on {item_id}: {}",
+                    last_message.unwrap_or_else(|| "unknown transport error".to_string())
+                )));
+            }
+            jettisoned_count += 1;
+        }
+        Ok(completed_with_message(last_message.unwrap_or_else(|| {
+            format!("Jettisoned all cargo stacks ({jettisoned_count} item types).")
+        })))
     }
 
     async fn ensure_docked(
