@@ -446,7 +446,7 @@ mod tests {
     #[test]
     fn parses_control_flow() {
         let src = r#"
-        if MISSION_COMPLETE(m1) { halt; }
+        if FUEL() { halt; }
         until FUEL() >= 50 { go alpha-1; }
         "#;
         let p = parse_script(src).expect("parse");
@@ -456,7 +456,7 @@ mod tests {
     #[test]
     fn rejects_mixed_case_control_flow_keywords() {
         let src = r#"
-        IF MISSION_COMPLETE(m1) { halt; }
+        IF FUEL() { halt; }
         UnTiL FUEL() >= 50 { go alpha-1; }
         "#;
         let err = parse_script(src).expect_err("expected parse error");
@@ -582,9 +582,9 @@ mod tests {
     }
 
     #[test]
-    fn parses_boolean_predicate_in_if() {
-        let src = "if MISSION_COMPLETE(m1) { halt; }";
-        let p = parse_script(src).expect("boolean pred");
+    fn parses_metric_call_condition_in_if() {
+        let src = "if FUEL() { halt; }";
+        let p = parse_script(src).expect("metric call condition");
         assert_eq!(p.statements.len(), 1);
         let block = if_node(&p.statements[0]);
         assert!(matches!(block.condition, ConditionExpr::MetricCall(_)));

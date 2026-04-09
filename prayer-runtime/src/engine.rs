@@ -608,14 +608,6 @@ impl RuntimeEngine {
         self.bool_predicates.clear();
         self.num_predicates.clear();
 
-        self.bool_predicates.insert(
-            "MISSION_COMPLETE".into(),
-            Arc::new(|state, args| {
-                let id = args.first()?;
-                Some(*state.mission_complete.get(id).unwrap_or(&true))
-            }),
-        );
-
         self.num_predicates
             .insert("FUEL".into(), Arc::new(|state, _| Some(state.fuel_pct)));
         self.num_predicates

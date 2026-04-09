@@ -520,13 +520,6 @@ mod tests {
                 arity: 0,
             },
         );
-        ctx.boolean_predicates.insert(
-            "MISSION_COMPLETE".to_string(),
-            PredicateSpec {
-                name: "MISSION_COMPLETE".to_string(),
-                arity: 1,
-            },
-        );
         ctx
     }
 

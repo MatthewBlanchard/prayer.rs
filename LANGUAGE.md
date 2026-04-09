@@ -30,7 +30,7 @@ Control-flow keywords are case-sensitive:
 Examples:
 
 ```prayer
-if MISSION_COMPLETE(mission_1) {
+if FUEL() >= 50 {
   halt;
 }
 
@@ -43,7 +43,7 @@ until FUEL() >= 50 {
 
 A condition is either:
 
-- A metric call, e.g. `MISSION_COMPLETE(m1)`
+- A metric call, e.g. `FUEL()`
 - A comparison, e.g. `FUEL() >= 50`
 
 Supported operators:
@@ -161,7 +161,7 @@ Current built-in commands:
 
 Boolean predicates:
 
-- `MISSION_COMPLETE(mission_id)`
+- None
 
 Numeric predicates:
 
@@ -279,19 +279,18 @@ until STASHED(iron_ore) >= 50 {
 }
 ```
 
-### 7) Mission progress loop using predicate
+### 7) Targeted mining loop with stashing
 
 Prompt:
 
 ```txt
-mine_resource: Mine 25 units of Copper Ore (24 / 25)
-mission_id=f0b9db
+mine copper ore and stash 25 this run
 ```
 
 Script:
 
 ```prayer
-until MISSION_COMPLETE(f0b9db) {
+until STASHED(copper_ore) >= 25 {
   mine copper_ore;
   go $home;
   stash;

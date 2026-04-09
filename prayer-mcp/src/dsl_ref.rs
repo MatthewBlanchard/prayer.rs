@@ -27,9 +27,7 @@ pub fn dsl_reference_json() -> serde_json::Value {
         "built_in_macros": ["$here", "$home", "$nearest_station"],
         "commands": commands,
         "predicates": {
-            "boolean": [
-                { "name": "MISSION_COMPLETE", "args": [{"name": "mission_id", "type": "mission_id"}] }
-            ],
+            "boolean": [],
             "numeric": [
                 { "name": "FUEL",    "args": [] },
                 { "name": "CREDITS", "args": [] },

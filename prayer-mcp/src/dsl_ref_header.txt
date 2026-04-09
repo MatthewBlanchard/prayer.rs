@@ -30,7 +30,7 @@ Control-flow keywords are case-sensitive:
 Examples:
 
 ```prayer
-if MISSION_COMPLETE(mission_1) {
+if FUEL() >= 50 {
   halt;
 }
 
@@ -43,7 +43,7 @@ until FUEL() >= 50 {
 
 A condition is either:
 
-- A metric call, e.g. `MISSION_COMPLETE(m1)`
+- A metric call, e.g. `FUEL()`
 - A comparison, e.g. `FUEL() >= 50`
 
 Supported operators:

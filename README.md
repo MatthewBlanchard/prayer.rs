@@ -60,7 +60,6 @@ Resource targeting note: `mine ore;` targets ore mining, but outputs can still i
 | `MINED(item_id)` | Numeric | Units mined this script run |
 | `STASHED(item_id)` | Numeric | Units stashed this script run |
 | `STASH(poi_id, item_id)` | Numeric | Units in storage at POI |
-| `MISSION_COMPLETE(mission_id)` | Boolean | Whether mission is complete |
 
 `MINED` and `STASHED` counters reset to zero when a new script is loaded.
 

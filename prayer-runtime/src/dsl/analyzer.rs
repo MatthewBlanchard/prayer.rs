@@ -697,7 +697,7 @@ mod tests {
 
     #[test]
     fn analyze_if_block_contains_analyzed_body() {
-        let ast = AstProgram::parse("if MISSION_COMPLETE(m1) { halt; }").expect("parse");
+        let ast = AstProgram::parse("if FUEL() { halt; }").expect("parse");
         let analyzed = analyze(&ast, &HashMap::new(), &GameState::default()).expect("analyze");
         let block = analyzed_if(&analyzed.statements[0]);
         assert_eq!(block.body.len(), 1);

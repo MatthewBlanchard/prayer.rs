@@ -42,7 +42,7 @@ pub const COMMAND_DOCS: &[(&str, &str)] = &[
     // Mining
     (
         "mine",
-        "Navigate to the nearest mining site and mine until cargo is full. Optionally filter by item type (e.g. iron_ore).",
+        "Navigate to the nearest mining site and mine until cargo is full. Optionally filter by item type (e.g. iron_ore). Mining iron_ore might give you other ores too. Use stash; in mining loops.",
     ),
     // Missions
     (
@@ -357,15 +357,6 @@ pub(crate) fn default_predicate_catalog() -> (
     HashMap<String, PredicateSpec>,
     HashMap<String, PredicateSpec>,
 ) {
-    let mut boolean = HashMap::new();
-    boolean.insert(
-        "MISSION_COMPLETE".to_string(),
-        PredicateSpec {
-            name: "MISSION_COMPLETE".to_string(),
-            arity: 1,
-        },
-    );
-
     let mut numeric = HashMap::new();
     for (name, arity) in [
         ("FUEL", 0usize),
@@ -385,7 +376,7 @@ pub(crate) fn default_predicate_catalog() -> (
         );
     }
 
-    (boolean, numeric)
+    (HashMap::new(), numeric)
 }
 
 #[cfg(test)]
