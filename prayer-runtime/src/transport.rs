@@ -570,6 +570,10 @@ fn map_command_spec(action: &str) -> Result<CommandSpecMap, TransportError> {
             api_action: "craft",
             payload_keys: &["recipe_id", "quantity"],
         }),
+        "use_item" => Ok(CommandSpecMap {
+            api_action: "use_item",
+            payload_keys: &["item_id", "quantity"],
+        }),
         // C# implements these as richer multi-step/high-level operations.
         "go" | "mine" | "explore" | "buy" | "sell" | "cancel_buy" | "cancel_sell" | "retrieve"
         | "stash" | "wait" | "set_home" | "refuel" | "jettison" => {
@@ -688,8 +692,18 @@ fn map_status_to_game_state(value: &Value) -> GameState {
     let ship_ids = extract_ids(result.get("ships"));
     let recipe_ids = extract_ids(result.get("available_recipes"));
     let shipyard_listings = extract_ids(result.get("shipyard_listings"));
-    let active_missions = extract_ids(result.get("active_missions"));
-    let available_missions = extract_ids(result.get("available_missions"));
+    let active_missions = extract_named_ids(
+        result
+            .get("active_missions")
+            .or_else(|| result.get("activeMissions")),
+        &["id", "mission_id", "missionId"],
+    );
+    let available_missions = extract_named_ids(
+        result
+            .get("available_missions")
+            .or_else(|| result.get("availableMissions")),
+        &["id", "mission_id", "missionId"],
+    );
     let owned_ships = extract_ids(result.get("owned_ships"));
     let installed_modules = extract_ids(
         ship.get("installed_modules")
@@ -1302,6 +1316,10 @@ fn parse_market_order_array(entries: &[Value]) -> Vec<MarketOrderInfo> {
 }
 
 fn extract_ids(value: Option<&Value>) -> Vec<String> {
+    extract_named_ids(value, &["id"])
+}
+
+fn extract_named_ids(value: Option<&Value>, keys: &[&str]) -> Vec<String> {
     let Some(Value::Array(entries)) = value else {
         return Vec::new();
     };
@@ -1310,7 +1328,13 @@ fn extract_ids(value: Option<&Value>) -> Vec<String> {
         .iter()
         .filter_map(|entry| match entry {
             Value::String(s) if !s.trim().is_empty() => Some(s.clone()),
-            Value::Object(map) => map.get("id").and_then(Value::as_str).map(ToOwned::to_owned),
+            Value::Object(map) => keys.iter().find_map(|key| {
+                map.get(*key)
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|v| !v.is_empty())
+                    .map(ToOwned::to_owned)
+            }),
             _ => None,
         })
         .collect()
@@ -1742,6 +1766,42 @@ mod tests {
         assert_eq!(state.own_sell_orders.len(), 1);
         assert_eq!(state.own_sell_orders[0].order_id, "os_1");
         assert_eq!(state.own_sell_orders[0].item_id, "water");
+    }
+
+    #[test]
+    fn map_status_to_game_state_extracts_missions_from_snake_case_ids() {
+        let status = serde_json::json!({
+            "result": {
+                "active_missions": [
+                    { "mission_id": "m_active_1" }
+                ],
+                "available_missions": [
+                    { "id": "m_avail_1" }
+                ]
+            }
+        });
+
+        let state = map_status_to_game_state(&status);
+        assert_eq!(state.missions.active, vec!["m_active_1".to_string()]);
+        assert_eq!(state.missions.available, vec!["m_avail_1".to_string()]);
+    }
+
+    #[test]
+    fn map_status_to_game_state_extracts_missions_from_camel_case_ids() {
+        let status = serde_json::json!({
+            "result": {
+                "activeMissions": [
+                    { "missionId": "m_active_camel" }
+                ],
+                "availableMissions": [
+                    "m_avail_camel"
+                ]
+            }
+        });
+
+        let state = map_status_to_game_state(&status);
+        assert_eq!(state.missions.active, vec!["m_active_camel".to_string()]);
+        assert_eq!(state.missions.available, vec!["m_avail_camel".to_string()]);
     }
 
     #[test]

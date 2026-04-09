@@ -137,6 +137,7 @@ Current built-in commands:
 - `retrieve <item> [quantity]`
 - `stash [item]`
 - `jettison [item]`
+- `use_item <item_id> [quantity]`
 - `switch_ship <ship>`
 - `install_mod <mod>`
 - `uninstall_mod <mod>`
