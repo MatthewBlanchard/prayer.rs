@@ -155,6 +155,7 @@ Current built-in commands:
 - `loot_wreck <wreck_id> <item_id> <quantity>`
 - `scrap_wreck`
 - `sell_wreck`
+- `distress_signal [fuel|repair|combat]`
 
 ## Default predicates
 

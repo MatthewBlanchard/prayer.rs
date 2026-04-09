@@ -34,6 +34,20 @@ pub(crate) fn default_command_catalog() -> HashMap<String, CommandSpec> {
             vec![arg("mission_id", ArgType::MissionId, true)],
         ),
     );
+    commands.insert(
+        "decline_mission".to_string(),
+        command(
+            "decline_mission",
+            vec![arg("template_id", ArgType::MissionId, true)],
+        ),
+    );
+    commands.insert(
+        "complete_mission".to_string(),
+        command(
+            "complete_mission",
+            vec![arg("mission_id", ArgType::MissionId, true)],
+        ),
+    );
     commands.insert("dock".to_string(), command("dock", vec![]));
     commands.insert("set_home".to_string(), command("set_home", vec![]));
     commands.insert("repair".to_string(), command("repair", vec![]));
@@ -77,6 +91,20 @@ pub(crate) fn default_command_catalog() -> HashMap<String, CommandSpec> {
     commands.insert(
         "stash".to_string(),
         command("stash", vec![arg("item", ArgType::ItemId, false)]),
+    );
+    commands.insert(
+        "jettison".to_string(),
+        command("jettison", vec![arg("item", ArgType::ItemId, false)]),
+    );
+    commands.insert(
+        "use_item".to_string(),
+        command(
+            "use_item",
+            vec![
+                arg("item_id", ArgType::ItemId, true),
+                arg("quantity", ArgType::Integer, false),
+            ],
+        ),
     );
     commands.insert(
         "switch_ship".to_string(),
@@ -134,6 +162,34 @@ pub(crate) fn default_command_catalog() -> HashMap<String, CommandSpec> {
                 arg("recipe_id", ArgType::RecipeId, true),
                 arg("count", ArgType::Integer, false),
             ],
+        ),
+    );
+    commands.insert(
+        "salvage_wreck".to_string(),
+        command("salvage_wreck", vec![arg("wreck_id", ArgType::Any, true)]),
+    );
+    commands.insert(
+        "tow_wreck".to_string(),
+        command("tow_wreck", vec![arg("wreck_id", ArgType::Any, true)]),
+    );
+    commands.insert(
+        "loot_wreck".to_string(),
+        command(
+            "loot_wreck",
+            vec![
+                arg("wreck_id", ArgType::Any, true),
+                arg("item_id", ArgType::ItemId, true),
+                arg("quantity", ArgType::Integer, true),
+            ],
+        ),
+    );
+    commands.insert("scrap_wreck".to_string(), command("scrap_wreck", vec![]));
+    commands.insert("sell_wreck".to_string(), command("sell_wreck", vec![]));
+    commands.insert(
+        "distress_signal".to_string(),
+        command(
+            "distress_signal",
+            vec![arg("distress_type", ArgType::Any, false)],
         ),
     );
 

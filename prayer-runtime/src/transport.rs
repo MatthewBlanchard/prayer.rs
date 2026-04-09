@@ -604,6 +604,10 @@ fn map_command_spec(action: &str) -> Result<CommandSpecMap, TransportError> {
             api_action: "sell_wreck",
             payload_keys: &[],
         }),
+        "distress_signal" => Ok(CommandSpecMap {
+            api_action: "distress_signal",
+            payload_keys: &["distress_type"],
+        }),
         // C# implements these as richer multi-step/high-level operations.
         "go" | "mine" | "explore" | "buy" | "sell" | "cancel_buy" | "cancel_sell" | "retrieve"
         | "stash" | "wait" | "set_home" | "refuel" | "jettison" | "dock" => {
