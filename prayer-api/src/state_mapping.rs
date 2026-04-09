@@ -11,8 +11,9 @@ use crate::{
     RuntimeGalaxyMarketDto, RuntimeGalaxyPoiInfoDto, RuntimeGalaxyResourcesDto,
     RuntimeGalaxyStateDto, RuntimeGalaxySystemInfoDto, RuntimeGameStateDto,
     RuntimeItemCatalogueEntryDto, RuntimeItemStackDto, RuntimeMarketStateDto,
-    RuntimeOpenOrderInfoDto, RuntimePlayerShipDto, RuntimePoiInfoDto, RuntimeRecipeEntryDto,
-    RuntimeRecipeIngredientEntryDto, RuntimeShipCatalogueEntryDto, RuntimeStationContextDto,
+    RuntimeMissionInfoDto, RuntimeOpenOrderInfoDto, RuntimePlayerShipDto, RuntimePoiInfoDto,
+    RuntimeRecipeEntryDto, RuntimeRecipeIngredientEntryDto, RuntimeShipCatalogueEntryDto,
+    RuntimeStationContextDto,
 };
 
 pub(crate) fn map_runtime_state(state: &GameState) -> Result<RuntimeGameStateDto, ApiError> {
@@ -303,13 +304,48 @@ pub(crate) fn map_runtime_state(state: &GameState) -> Result<RuntimeGameStateDto
         owned_ships: Vec::new(),
         available_recipes: Vec::new(),
         skills: HashMap::new(),
-        active_missions: Vec::new(),
-        available_missions: Vec::new(),
+        active_missions: map_missions(&state.missions.active, state, true),
+        available_missions: map_missions(&state.missions.available, state, false),
         notifications: Vec::new(),
         chat_messages: Vec::new(),
         current_market: None::<RuntimeMarketStateDto>,
         station,
     })
+}
+
+fn map_missions(ids: &[String], state: &GameState, active: bool) -> Vec<RuntimeMissionInfoDto> {
+    ids.iter()
+        .filter(|id| !id.trim().is_empty())
+        .map(|id| RuntimeMissionInfoDto {
+            id: id.clone(),
+            mission_id: id.clone(),
+            template_id: id.clone(),
+            title: id.clone(),
+            r#type: String::new(),
+            description: String::new(),
+            progress_text: String::new(),
+            completed: if active {
+                *state.mission_complete.get(id).unwrap_or(&false)
+            } else {
+                false
+            },
+            difficulty: None,
+            expires_in_ticks: None,
+            accepted_at: String::new(),
+            issuing_base: String::new(),
+            issuing_base_id: String::new(),
+            giver_name: String::new(),
+            giver_title: String::new(),
+            repeatable: None,
+            faction_id: String::new(),
+            faction_name: String::new(),
+            chain_next: String::new(),
+            objectives_summary: String::new(),
+            progress_summary: String::new(),
+            requirements_summary: String::new(),
+            rewards_summary: String::new(),
+        })
+        .collect()
 }
 
 fn required_non_empty_state_field(field: &str, value: Option<&str>) -> Result<String, ApiError> {
@@ -750,6 +786,47 @@ mod tests {
         assert_eq!(dto.own_buy_orders.len(), 1);
         assert_eq!(dto.own_buy_orders[0].order_id, "ob_1");
         assert!(dto.own_sell_orders.is_empty());
+    }
+
+    #[test]
+    fn map_runtime_state_missions_forwarded_to_dto() {
+        let state = GameState {
+            mission_complete: std::sync::Arc::new(std::collections::HashMap::from([(
+                "active_1".to_string(),
+                true,
+            )])),
+            missions: std::sync::Arc::new(prayer_runtime::engine::MissionData {
+                active: vec!["active_1".to_string()],
+                available: vec!["avail_1".to_string()],
+            }),
+            system: Some("sol".to_string()),
+            ..GameState::default()
+        };
+
+        let dto = map_runtime_state(&state).expect("state should map");
+        assert_eq!(dto.active_missions.len(), 1);
+        assert_eq!(dto.available_missions.len(), 1);
+        assert_eq!(dto.active_missions[0].mission_id, "active_1");
+        assert_eq!(dto.available_missions[0].mission_id, "avail_1");
+        assert!(dto.active_missions[0].completed);
+        assert!(!dto.available_missions[0].completed);
+    }
+
+    #[test]
+    fn map_runtime_state_missions_filters_blank_ids() {
+        let state = GameState {
+            missions: std::sync::Arc::new(prayer_runtime::engine::MissionData {
+                active: vec!["".to_string(), "  ".to_string()],
+                available: vec!["ok_1".to_string()],
+            }),
+            system: Some("sol".to_string()),
+            ..GameState::default()
+        };
+
+        let dto = map_runtime_state(&state).expect("state should map");
+        assert!(dto.active_missions.is_empty());
+        assert_eq!(dto.available_missions.len(), 1);
+        assert_eq!(dto.available_missions[0].mission_id, "ok_1");
     }
 
     #[test]
