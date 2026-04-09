@@ -30,6 +30,7 @@ impl SpaceMoltTransport {
             "cancel_buy" => Ok(Some(self.handle_cancel_buy(command, runtime_state).await?)),
             "cancel_sell" => Ok(Some(self.handle_cancel_sell(command, runtime_state).await?)),
             "jettison" => Ok(Some(self.handle_jettison(command, runtime_state).await?)),
+            "dock" => Ok(Some(self.handle_dock(runtime_state).await?)),
             _ => Ok(None),
         }
     }
@@ -562,6 +563,17 @@ impl SpaceMoltTransport {
         let item_id = required_text_arg(command, 0, "cancel_sell")?;
         let result = cancel_orders_for_item(self, item_id, state.own_sell_orders.as_ref()).await?;
         Ok(completed_with_message(result))
+    }
+
+    async fn handle_dock(
+        &self,
+        runtime_state: Option<&GameState>,
+    ) -> Result<EngineExecutionResult, TransportError> {
+        let state = required_runtime_state(runtime_state, "dock")?;
+        if let Some(result) = self.ensure_docked(state, false, "dock").await? {
+            return Ok(result);
+        }
+        Ok(completed_with_message("Docked."))
     }
 
     async fn handle_jettison(
