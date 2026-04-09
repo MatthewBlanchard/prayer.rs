@@ -209,10 +209,16 @@ impl RuntimeTransport for SpaceMoltTransport {
         if let Ok(map) = self.execute_api("get_map", None).await {
             enrich_from_get_map(&mut state, &map);
         }
+        if let Ok(active_missions) = self.execute_api("get_active_missions", None).await {
+            enrich_from_get_active_missions(&mut state, &active_missions);
+        }
         self.refresh_catalog_cache_if_needed().await;
         self.enrich_catalog_ids_from_cache(&mut state);
 
         if state.docked {
+            if let Ok(available_missions) = self.execute_api("get_missions", None).await {
+                enrich_from_get_missions(&mut state, &available_missions);
+            }
             if let Some(station_id) = state.current_poi.clone() {
                 if let Ok(storage) = self
                     .execute_api(
@@ -534,6 +540,14 @@ fn map_command_spec(action: &str) -> Result<CommandSpecMap, TransportError> {
             api_action: "abandon_mission",
             payload_keys: &["mission_id"],
         }),
+        "decline_mission" => Ok(CommandSpecMap {
+            api_action: "decline_mission",
+            payload_keys: &["template_id"],
+        }),
+        "complete_mission" => Ok(CommandSpecMap {
+            api_action: "complete_mission",
+            payload_keys: &["mission_id"],
+        }),
         "switch_ship" => Ok(CommandSpecMap {
             api_action: "switch_ship",
             payload_keys: &["ship_id"],
@@ -569,10 +583,6 @@ fn map_command_spec(action: &str) -> Result<CommandSpecMap, TransportError> {
         "craft" => Ok(CommandSpecMap {
             api_action: "craft",
             payload_keys: &["recipe_id", "quantity"],
-        }),
-        "use_item" => Ok(CommandSpecMap {
-            api_action: "use_item",
-            payload_keys: &["item_id", "quantity"],
         }),
         // C# implements these as richer multi-step/high-level operations.
         "go" | "mine" | "explore" | "buy" | "sell" | "cancel_buy" | "cancel_sell" | "retrieve"
@@ -692,18 +702,8 @@ fn map_status_to_game_state(value: &Value) -> GameState {
     let ship_ids = extract_ids(result.get("ships"));
     let recipe_ids = extract_ids(result.get("available_recipes"));
     let shipyard_listings = extract_ids(result.get("shipyard_listings"));
-    let active_missions = extract_named_ids(
-        result
-            .get("active_missions")
-            .or_else(|| result.get("activeMissions")),
-        &["id", "mission_id", "missionId"],
-    );
-    let available_missions = extract_named_ids(
-        result
-            .get("available_missions")
-            .or_else(|| result.get("availableMissions")),
-        &["id", "mission_id", "missionId"],
-    );
+    let active_missions = extract_ids(result.get("active_missions"));
+    let available_missions = extract_ids(result.get("available_missions"));
     let owned_ships = extract_ids(result.get("owned_ships"));
     let installed_modules = extract_ids(
         ship.get("installed_modules")
@@ -1289,6 +1289,38 @@ fn enrich_from_view_orders(state: &mut GameState, value: &Value) {
     }
 }
 
+fn enrich_from_get_active_missions(state: &mut GameState, value: &Value) {
+    let root = value.get("result").unwrap_or(value);
+    let ids = extract_mission_ids(
+        root.get("missions")
+            .or_else(|| root.get("active_missions"))
+            .or_else(|| root.get("activeMissions")),
+    );
+    if ids.is_empty() {
+        return;
+    }
+
+    let mut missions = state.missions.as_ref().clone();
+    missions.active = ids;
+    state.missions = Arc::new(missions);
+}
+
+fn enrich_from_get_missions(state: &mut GameState, value: &Value) {
+    let root = value.get("result").unwrap_or(value);
+    let ids = extract_mission_ids(
+        root.get("missions")
+            .or_else(|| root.get("available_missions"))
+            .or_else(|| root.get("availableMissions")),
+    );
+    if ids.is_empty() {
+        return;
+    }
+
+    let mut missions = state.missions.as_ref().clone();
+    missions.available = ids;
+    state.missions = Arc::new(missions);
+}
+
 fn parse_market_order_array(entries: &[Value]) -> Vec<MarketOrderInfo> {
     entries
         .iter()
@@ -1317,6 +1349,10 @@ fn parse_market_order_array(entries: &[Value]) -> Vec<MarketOrderInfo> {
 
 fn extract_ids(value: Option<&Value>) -> Vec<String> {
     extract_named_ids(value, &["id"])
+}
+
+fn extract_mission_ids(value: Option<&Value>) -> Vec<String> {
+    extract_named_ids(value, &["mission_id", "missionId", "id"])
 }
 
 fn extract_named_ids(value: Option<&Value>, keys: &[&str]) -> Vec<String> {
@@ -1769,42 +1805,6 @@ mod tests {
     }
 
     #[test]
-    fn map_status_to_game_state_extracts_missions_from_snake_case_ids() {
-        let status = serde_json::json!({
-            "result": {
-                "active_missions": [
-                    { "mission_id": "m_active_1" }
-                ],
-                "available_missions": [
-                    { "id": "m_avail_1" }
-                ]
-            }
-        });
-
-        let state = map_status_to_game_state(&status);
-        assert_eq!(state.missions.active, vec!["m_active_1".to_string()]);
-        assert_eq!(state.missions.available, vec!["m_avail_1".to_string()]);
-    }
-
-    #[test]
-    fn map_status_to_game_state_extracts_missions_from_camel_case_ids() {
-        let status = serde_json::json!({
-            "result": {
-                "activeMissions": [
-                    { "missionId": "m_active_camel" }
-                ],
-                "availableMissions": [
-                    "m_avail_camel"
-                ]
-            }
-        });
-
-        let state = map_status_to_game_state(&status);
-        assert_eq!(state.missions.active, vec!["m_active_camel".to_string()]);
-        assert_eq!(state.missions.available, vec!["m_avail_camel".to_string()]);
-    }
-
-    #[test]
     fn map_status_to_game_state_extracts_cargo_array() {
         let status = serde_json::json!({
             "result": {
@@ -1820,6 +1820,49 @@ mod tests {
         let state = map_status_to_game_state(&status);
         assert_eq!(state.cargo.get("iron"), Some(&3));
         assert_eq!(state.cargo.get("water"), Some(&1));
+    }
+
+    #[test]
+    fn enrich_from_get_active_missions_uses_result_missions_array() {
+        let mut state = GameState::default();
+        let payload = serde_json::json!({
+            "result": {
+                "missions": [
+                    { "mission_id": "m_active_1" }
+                ]
+            }
+        });
+
+        enrich_from_get_active_missions(&mut state, &payload);
+        assert_eq!(state.missions.active, vec!["m_active_1".to_string()]);
+    }
+
+    #[test]
+    fn enrich_from_get_missions_uses_result_missions_array() {
+        let mut state = GameState::default();
+        let payload = serde_json::json!({
+            "result": {
+                "missions": [
+                    { "mission_id": "m_avail_1" }
+                ]
+            }
+        });
+
+        enrich_from_get_missions(&mut state, &payload);
+        assert_eq!(state.missions.available, vec!["m_avail_1".to_string()]);
+    }
+
+    #[test]
+    fn extract_mission_ids_accepts_camel_case_and_string_entries() {
+        let value = serde_json::json!([
+            { "missionId": "m_1" },
+            "m_2"
+        ]);
+
+        assert_eq!(
+            extract_mission_ids(Some(&value)),
+            vec!["m_1".to_string(), "m_2".to_string()]
+        );
     }
 
     #[test]

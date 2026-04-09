@@ -125,6 +125,8 @@ Current built-in commands:
 - `go <destination>`
 - `accept_mission <mission_id>`
 - `abandon_mission <mission_id>`
+- `decline_mission <template_id>`
+- `complete_mission <mission_id>`
 - `dock`
 - `set_home`
 - `repair`
