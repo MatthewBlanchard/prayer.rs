@@ -78,7 +78,14 @@ pub(crate) fn map_runtime_state(state: &GameState) -> RuntimeGameStateDto {
                 .poi_type_by_id
                 .get(poi_id)
                 .cloned()
-                .unwrap_or_default();
+                .unwrap_or_else(|| {
+                    if !docked && *poi_id == current_poi_id && *poi_id == system && !system.is_empty()
+                    {
+                        "space".to_string()
+                    } else {
+                        String::new()
+                    }
+                });
             let base_id = poi_base_by_id.get(poi_id).cloned();
             RuntimeGalaxyKnownPoiInfoDto {
                 id: poi_id.clone(),

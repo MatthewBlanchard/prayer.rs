@@ -1,7 +1,7 @@
 //! Runtime transport boundary and SpaceMolt adapter stubs.
 
 use std::collections::{HashMap, HashSet};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use crate::engine::{
     CatalogEntryData, CommandArg, EngineCommand, EngineError, EngineExecutionResult, GalaxyData,
@@ -106,16 +106,22 @@ impl SpaceMoltTransport {
         if item_ids.is_empty() && ship_ids.is_empty() && recipe_ids.is_empty() {
             return;
         }
-        if let Ok(mut cache) = self.catalog_cache.lock() {
-            *cache = Some(CatalogCacheEntry {
-                version,
-                item_ids,
-                ship_ids,
-                recipe_ids,
-                item_entries: galaxy.item_catalog_entries.clone(),
-                ship_entries: galaxy.ship_catalog_entries.clone(),
-                recipe_entries: galaxy.recipe_catalog_entries.clone(),
-            });
+        let mut cache = self.catalog_cache_guard();
+        *cache = Some(CatalogCacheEntry {
+            version,
+            item_ids,
+            ship_ids,
+            recipe_ids,
+            item_entries: galaxy.item_catalog_entries.clone(),
+            ship_entries: galaxy.ship_catalog_entries.clone(),
+            recipe_entries: galaxy.recipe_catalog_entries.clone(),
+        });
+    }
+
+    fn catalog_cache_guard(&self) -> MutexGuard<'_, Option<CatalogCacheEntry>> {
+        match self.catalog_cache.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
         }
     }
 }
@@ -341,8 +347,8 @@ impl SpaceMoltTransport {
         let version = self.current_server_version().await.ok().flatten();
 
         let needs_refresh = {
-            let lock = self.catalog_cache.lock().ok();
-            match lock.and_then(|entry| entry.clone()) {
+            let cached_entry = self.catalog_cache_guard().clone();
+            match cached_entry {
                 Some(entry) => match version.as_deref() {
                     Some(v) => entry.version.as_deref() != Some(v),
                     None => {
@@ -375,25 +381,20 @@ impl SpaceMoltTransport {
         let ship_ids = ship_entries.keys().cloned().collect::<Vec<_>>();
         let recipe_ids = recipe_entries.keys().cloned().collect::<Vec<_>>();
 
-        if let Ok(mut cache) = self.catalog_cache.lock() {
-            *cache = Some(CatalogCacheEntry {
-                version,
-                item_ids,
-                ship_ids,
-                recipe_ids,
-                item_entries,
-                ship_entries,
-                recipe_entries,
-            });
-        }
+        let mut cache = self.catalog_cache_guard();
+        *cache = Some(CatalogCacheEntry {
+            version,
+            item_ids,
+            ship_ids,
+            recipe_ids,
+            item_entries,
+            ship_entries,
+            recipe_entries,
+        });
     }
 
     fn enrich_catalog_ids_from_cache(&self, state: &mut GameState) {
-        let entry = self
-            .catalog_cache
-            .lock()
-            .ok()
-            .and_then(|entry| entry.clone());
+        let entry = self.catalog_cache_guard().clone();
         let Some(entry) = entry else {
             return;
         };
