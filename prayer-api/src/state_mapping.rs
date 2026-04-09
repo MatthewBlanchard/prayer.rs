@@ -5,6 +5,7 @@ use prayer_runtime::engine::{CatalogEntryData, GameState};
 use serde_json::Value;
 
 use crate::{
+    ApiError,
     RuntimeCatalogueDto, RuntimeCatalogueEntryDto, RuntimeGalaxyCatalogDto,
     RuntimeGalaxyExplorationDto, RuntimeGalaxyKnownPoiInfoDto, RuntimeGalaxyMapSnapshotDto,
     RuntimeGalaxyMarketDto, RuntimeGalaxyPoiInfoDto, RuntimeGalaxyResourcesDto,
@@ -14,13 +15,15 @@ use crate::{
     RuntimeRecipeIngredientEntryDto, RuntimeShipCatalogueEntryDto, RuntimeStationContextDto,
 };
 
-pub(crate) fn map_runtime_state(state: &GameState) -> RuntimeGameStateDto {
-    let system = state.system.clone().unwrap_or_default();
+pub(crate) fn map_runtime_state(state: &GameState) -> Result<RuntimeGameStateDto, ApiError> {
+    let system = required_non_empty_state_field("system", state.system.as_deref())?;
     let home_base = state.home_base.clone().unwrap_or_default();
     let docked = state.docked;
     let current_poi_id = state
         .current_poi
-        .clone()
+        .as_ref()
+        .filter(|poi| !poi.trim().is_empty())
+        .cloned()
         .unwrap_or_else(|| system.clone());
     let storage_source = state
         .home_base
@@ -238,7 +241,7 @@ pub(crate) fn map_runtime_state(state: &GameState) -> RuntimeGameStateDto {
     } else {
         None
     };
-    RuntimeGameStateDto {
+    Ok(RuntimeGameStateDto {
         system: system.clone(),
         current_poi: current_poi.clone(),
         pois,
@@ -306,6 +309,15 @@ pub(crate) fn map_runtime_state(state: &GameState) -> RuntimeGameStateDto {
         chat_messages: Vec::new(),
         current_market: None::<RuntimeMarketStateDto>,
         station,
+    })
+}
+
+fn required_non_empty_state_field(field: &str, value: Option<&str>) -> Result<String, ApiError> {
+    match value.map(str::trim).filter(|v| !v.is_empty()) {
+        Some(v) => Ok(v.to_string()),
+        None => Err(ApiError::InvalidRuntimeState(format!(
+            "missing required runtime state field '{field}'"
+        ))),
     }
 }
 
@@ -597,7 +609,7 @@ mod tests {
             docked: false,
             ..GameState::default()
         };
-        let dto = map_runtime_state(&state);
+        let dto = map_runtime_state(&state).expect("state should map");
         assert_eq!(dto.system, "sol");
         assert_eq!(dto.current_poi.id, "sol");
         assert_eq!(dto.current_poi.r#type, "space");
@@ -611,7 +623,7 @@ mod tests {
             docked: true,
             ..GameState::default()
         };
-        let dto = map_runtime_state(&state);
+        let dto = map_runtime_state(&state).expect("state should map");
         assert_eq!(dto.current_poi.id, "sol_station");
         assert_eq!(dto.current_poi.r#type, "");
         assert!(dto.docked);
@@ -626,7 +638,7 @@ mod tests {
             docked: true,
             ..GameState::default()
         };
-        let dto = map_runtime_state(&state);
+        let dto = map_runtime_state(&state).expect("state should map");
         assert_eq!(dto.current_poi.id, "sol");
     }
 
@@ -643,7 +655,7 @@ mod tests {
             ..GameState::default()
         };
 
-        let dto = map_runtime_state(&state);
+        let dto = map_runtime_state(&state).expect("state should map");
         assert!(dto.storage_items.contains_key("iron_ore"));
         assert_eq!(dto.storage_items["iron_ore"].quantity, 42);
     }
@@ -655,7 +667,7 @@ mod tests {
             home_base: None,
             ..GameState::default()
         };
-        let dto = map_runtime_state(&state);
+        let dto = map_runtime_state(&state).expect("state should map");
         assert!(dto.storage_items.is_empty());
     }
 
@@ -667,7 +679,7 @@ mod tests {
             docked: true,
             ..GameState::default()
         };
-        let dto = map_runtime_state(&state);
+        let dto = map_runtime_state(&state).expect("state should map");
         assert!(dto.station.is_some());
     }
 
@@ -678,7 +690,7 @@ mod tests {
             docked: false,
             ..GameState::default()
         };
-        let dto = map_runtime_state(&state);
+        let dto = map_runtime_state(&state).expect("state should map");
         assert!(dto.station.is_none());
     }
 
@@ -693,7 +705,7 @@ mod tests {
             ..GameState::default()
         };
 
-        let dto = map_runtime_state(&state);
+        let dto = map_runtime_state(&state).expect("state should map");
         assert!(dto
             .galaxy
             .resources
@@ -711,9 +723,10 @@ mod tests {
         let state = GameState {
             credits: 9999,
             fuel_pct: 42,
+            system: Some("sol".to_string()),
             ..GameState::default()
         };
-        let dto = map_runtime_state(&state);
+        let dto = map_runtime_state(&state).expect("state should map");
         assert_eq!(dto.credits, 9999);
         assert_eq!(dto.ship.fuel, 42);
         assert_eq!(dto.ship.fuel_percent, 42);
@@ -729,12 +742,20 @@ mod tests {
                 quantity: 5,
             }]),
             own_sell_orders: std::sync::Arc::new(vec![]),
+            system: Some("sol".to_string()),
             ..GameState::default()
         };
 
-        let dto = map_runtime_state(&state);
+        let dto = map_runtime_state(&state).expect("state should map");
         assert_eq!(dto.own_buy_orders.len(), 1);
         assert_eq!(dto.own_buy_orders[0].order_id, "ob_1");
         assert!(dto.own_sell_orders.is_empty());
+    }
+
+    #[test]
+    fn map_runtime_state_errors_when_system_missing() {
+        let state = GameState::default();
+        let err = map_runtime_state(&state).expect_err("missing system should error");
+        assert!(matches!(err, ApiError::InvalidRuntimeState(_)));
     }
 }

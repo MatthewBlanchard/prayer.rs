@@ -608,7 +608,7 @@ async fn load_runtime_state(
     if !session.has_state {
         return Ok(None);
     }
-    Ok(Some(map_runtime_state(&session.effective_state)))
+    Ok(Some(map_runtime_state(&session.effective_state)?))
 }
 
 async fn spacemolt_passthrough(

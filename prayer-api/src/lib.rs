@@ -33,6 +33,9 @@ pub enum ApiError {
     /// Invalid client request.
     #[error("{0}")]
     BadRequest(String),
+    /// Runtime state is missing required fields.
+    #[error("invalid runtime state: {0}")]
+    InvalidRuntimeState(String),
 }
 
 impl ApiError {
@@ -43,6 +46,7 @@ impl ApiError {
             Self::Engine(_) => StatusCode::BAD_REQUEST,
             Self::Transport(_) => StatusCode::BAD_GATEWAY,
             Self::BadRequest(_) => StatusCode::BAD_REQUEST,
+            Self::InvalidRuntimeState(_) => StatusCode::BAD_GATEWAY,
         }
     }
 }

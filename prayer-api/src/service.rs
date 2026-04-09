@@ -880,7 +880,7 @@ impl RuntimeService {
             .collect();
         let response = RuntimeStateResponse {
             state: if session.has_state {
-                Some(map_runtime_state(&session.effective_state))
+                Some(map_runtime_state(&session.effective_state)?)
             } else {
                 None
             },
@@ -1010,7 +1010,10 @@ mod tests {
         }
 
         async fn fetch_state(&self) -> Result<GameState, TransportError> {
-            Ok(GameState::default())
+            Ok(GameState {
+                system: Some("sol".to_string()),
+                ..GameState::default()
+            })
         }
 
         async fn execute_passthrough(
