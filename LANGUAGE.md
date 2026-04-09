@@ -150,6 +150,11 @@ Current built-in commands:
 - `list_ship_for_sale <ship> <price>`
 - `wait [ticks]`
 - `craft <recipe_id> [count]`
+- `salvage_wreck <wreck_id>`
+- `tow_wreck <wreck_id>`
+- `loot_wreck <wreck_id> <item_id> <quantity>`
+- `scrap_wreck`
+- `sell_wreck`
 
 ## Default predicates
 

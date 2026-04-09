@@ -580,6 +580,30 @@ fn map_command_spec(action: &str) -> Result<CommandSpecMap, TransportError> {
             api_action: "craft",
             payload_keys: &["recipe_id", "quantity"],
         }),
+        "use_item" => Ok(CommandSpecMap {
+            api_action: "use_item",
+            payload_keys: &["item_id", "quantity"],
+        }),
+        "salvage_wreck" => Ok(CommandSpecMap {
+            api_action: "salvage_wreck",
+            payload_keys: &["wreck_id"],
+        }),
+        "tow_wreck" => Ok(CommandSpecMap {
+            api_action: "tow_wreck",
+            payload_keys: &["wreck_id"],
+        }),
+        "loot_wreck" => Ok(CommandSpecMap {
+            api_action: "loot_wreck",
+            payload_keys: &["wreck_id", "item_id", "quantity"],
+        }),
+        "scrap_wreck" => Ok(CommandSpecMap {
+            api_action: "scrap_wreck",
+            payload_keys: &[],
+        }),
+        "sell_wreck" => Ok(CommandSpecMap {
+            api_action: "sell_wreck",
+            payload_keys: &[],
+        }),
         // C# implements these as richer multi-step/high-level operations.
         "go" | "mine" | "explore" | "buy" | "sell" | "cancel_buy" | "cancel_sell" | "retrieve"
         | "stash" | "wait" | "set_home" | "refuel" | "jettison" | "dock" => {
