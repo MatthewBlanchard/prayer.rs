@@ -119,7 +119,6 @@ Engine state is fully serializable. Multi-turn commands (`mine`, `go`, `refuel`,
 |---|---|
 | `prayer-runtime` | DSL parser, analyzer, execution engine, transport trait, game state model |
 | `prayer-api` | Axum HTTP server, session management, SpaceMolt auth integration |
-| `prayer-compat-adapter` | Thin shim for legacy clients on `/compat/v1/*` |
 | `prayer-mcp` | MCP server that proxies Prayer API calls and exposes EffectiveState as a virtual filesystem (VFS) |
 
 ---

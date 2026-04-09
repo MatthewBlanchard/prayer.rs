@@ -468,32 +468,6 @@ impl RuntimeTransport for MockTransport {
     }
 }
 
-/// Backward-compatible transport payload used by legacy compatibility adapter.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CompatCommandPayload {
-    /// Action name.
-    pub action: String,
-    /// Command args.
-    pub args: Vec<String>,
-}
-
-impl TryFrom<CompatCommandPayload> for EngineCommand {
-    type Error = EngineError;
-
-    fn try_from(value: CompatCommandPayload) -> Result<Self, Self::Error> {
-        if value.action.trim().is_empty() {
-            return Err(EngineError::InvalidState(
-                "compat command action cannot be empty".to_string(),
-            ));
-        }
-        Ok(Self {
-            action: value.action,
-            args: value.args.into_iter().map(CommandArg::Any).collect(),
-            source_line: None,
-        })
-    }
-}
-
 fn map_failed_response(status: StatusCode, body: Option<String>) -> TransportError {
     TransportError::Api {
         status: status.as_u16(),

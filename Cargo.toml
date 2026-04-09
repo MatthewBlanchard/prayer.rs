@@ -2,7 +2,6 @@
 members = [
   "prayer-runtime",
   "prayer-api",
-  "prayer-compat-adapter",
   "prayer-mcp",
 ]
 resolver = "2"
