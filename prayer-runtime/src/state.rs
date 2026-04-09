@@ -82,11 +82,66 @@ pub struct MarketData {
 
 /// Snapshot of mission entities used for analyzer identity resolution.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MissionInfoData {
+    /// Mission instance id.
+    pub id: String,
+    /// Mission id.
+    pub mission_id: String,
+    /// Template id.
+    pub template_id: String,
+    /// Title.
+    pub title: String,
+    /// Type.
+    pub mission_type: String,
+    /// Description.
+    pub description: String,
+    /// Progress text.
+    pub progress_text: String,
+    /// Completion flag.
+    pub completed: bool,
+    /// Difficulty.
+    pub difficulty: Option<i64>,
+    /// Ticks until expiry.
+    pub expires_in_ticks: Option<i64>,
+    /// Accepted timestamp text.
+    pub accepted_at: String,
+    /// Issuing base.
+    pub issuing_base: String,
+    /// Issuing base id.
+    pub issuing_base_id: String,
+    /// Giver name.
+    pub giver_name: String,
+    /// Giver title.
+    pub giver_title: String,
+    /// Repeatable flag.
+    pub repeatable: Option<bool>,
+    /// Faction id.
+    pub faction_id: String,
+    /// Faction name.
+    pub faction_name: String,
+    /// Chain next id.
+    pub chain_next: String,
+    /// Objectives summary.
+    pub objectives_summary: String,
+    /// Progress summary.
+    pub progress_summary: String,
+    /// Requirements summary.
+    pub requirements_summary: String,
+    /// Rewards summary.
+    pub rewards_summary: String,
+}
+
+/// Snapshot of mission entities used for analyzer identity resolution.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MissionData {
     /// Active mission ids.
     pub active: Vec<String>,
     /// Available mission ids.
     pub available: Vec<String>,
+    /// Active mission details keyed in-list order.
+    pub active_details: Vec<MissionInfoData>,
+    /// Available mission details keyed in-list order.
+    pub available_details: Vec<MissionInfoData>,
 }
 
 /// Open market order metadata from runtime snapshot.

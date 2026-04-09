@@ -16,7 +16,7 @@ use thiserror::Error;
 
 pub use crate::state::{
     CatalogEntryData, GalaxyData, GameState, MarketData, MarketOrderInfo, MissionData,
-    OpenOrderInfo, ShipState,
+    MissionInfoData, OpenOrderInfo, ShipState,
 };
 
 /// Engine errors.

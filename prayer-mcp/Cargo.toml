@@ -27,3 +27,6 @@ anyhow.workspace = true
 parking_lot.workspace = true
 axum.workspace = true
 prayer-runtime = { path = "../prayer-runtime" }
+
+[build-dependencies]
+prayer-runtime = { path = "../prayer-runtime" }

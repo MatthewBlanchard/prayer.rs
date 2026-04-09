@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use chrono::Utc;
-use prayer_runtime::engine::{CatalogEntryData, GameState};
+use prayer_runtime::engine::{CatalogEntryData, GameState, MissionInfoData};
 use serde_json::Value;
 
 use crate::{
@@ -27,9 +27,15 @@ pub(crate) fn map_runtime_state(state: &GameState) -> Result<RuntimeGameStateDto
         .cloned()
         .unwrap_or_else(|| system.clone());
     let storage_source = state
-        .home_base
+        .current_poi
         .as_ref()
-        .and_then(|base| state.stash.get(base))
+        .and_then(|poi| state.stash.get(poi))
+        .or_else(|| {
+            state
+                .home_base
+                .as_ref()
+                .and_then(|base| state.stash.get(base))
+        })
         .cloned()
         .unwrap_or_default();
     let storage_items = map_item_stacks(&storage_source);
@@ -304,8 +310,18 @@ pub(crate) fn map_runtime_state(state: &GameState) -> Result<RuntimeGameStateDto
         owned_ships: Vec::new(),
         available_recipes: Vec::new(),
         skills: HashMap::new(),
-        active_missions: map_missions(&state.missions.active, state, true),
-        available_missions: map_missions(&state.missions.available, state, false),
+        active_missions: map_missions(
+            &state.missions.active,
+            &state.missions.active_details,
+            state,
+            true,
+        ),
+        available_missions: map_missions(
+            &state.missions.available,
+            &state.missions.available_details,
+            state,
+            false,
+        ),
         notifications: Vec::new(),
         chat_messages: Vec::new(),
         current_market: None::<RuntimeMarketStateDto>,
@@ -313,37 +329,68 @@ pub(crate) fn map_runtime_state(state: &GameState) -> Result<RuntimeGameStateDto
     })
 }
 
-fn map_missions(ids: &[String], state: &GameState, active: bool) -> Vec<RuntimeMissionInfoDto> {
+fn map_missions(
+    ids: &[String],
+    details: &[MissionInfoData],
+    state: &GameState,
+    active: bool,
+) -> Vec<RuntimeMissionInfoDto> {
+    let details_by_id = details
+        .iter()
+        .filter(|detail| !detail.mission_id.trim().is_empty())
+        .map(|detail| (detail.mission_id.clone(), detail))
+        .collect::<HashMap<_, _>>();
+
     ids.iter()
         .filter(|id| !id.trim().is_empty())
-        .map(|id| RuntimeMissionInfoDto {
-            id: id.clone(),
-            mission_id: id.clone(),
-            template_id: id.clone(),
-            title: id.clone(),
-            r#type: String::new(),
-            description: String::new(),
-            progress_text: String::new(),
-            completed: if active {
-                *state.mission_complete.get(id).unwrap_or(&false)
-            } else {
-                false
-            },
-            difficulty: None,
-            expires_in_ticks: None,
-            accepted_at: String::new(),
-            issuing_base: String::new(),
-            issuing_base_id: String::new(),
-            giver_name: String::new(),
-            giver_title: String::new(),
-            repeatable: None,
-            faction_id: String::new(),
-            faction_name: String::new(),
-            chain_next: String::new(),
-            objectives_summary: String::new(),
-            progress_summary: String::new(),
-            requirements_summary: String::new(),
-            rewards_summary: String::new(),
+        .map(|id| {
+            let detail = details_by_id.get(id).copied();
+            RuntimeMissionInfoDto {
+                id: detail
+                    .map(|m| m.id.clone())
+                    .filter(|v| !v.is_empty())
+                    .unwrap_or_else(|| id.clone()),
+                mission_id: id.clone(),
+                template_id: detail
+                    .map(|m| m.template_id.clone())
+                    .filter(|v| !v.is_empty())
+                    .unwrap_or_else(|| id.clone()),
+                title: detail
+                    .map(|m| m.title.clone())
+                    .filter(|v| !v.is_empty())
+                    .unwrap_or_else(|| id.clone()),
+                r#type: detail.map(|m| m.mission_type.clone()).unwrap_or_default(),
+                description: detail.map(|m| m.description.clone()).unwrap_or_default(),
+                progress_text: detail.map(|m| m.progress_text.clone()).unwrap_or_default(),
+                completed: detail.map(|m| m.completed).unwrap_or(false) || {
+                    if active {
+                        *state.mission_complete.get(id).unwrap_or(&false)
+                    } else {
+                        false
+                    }
+                },
+                difficulty: detail.and_then(|m| m.difficulty),
+                expires_in_ticks: detail.and_then(|m| m.expires_in_ticks),
+                accepted_at: detail.map(|m| m.accepted_at.clone()).unwrap_or_default(),
+                issuing_base: detail.map(|m| m.issuing_base.clone()).unwrap_or_default(),
+                issuing_base_id: detail.map(|m| m.issuing_base_id.clone()).unwrap_or_default(),
+                giver_name: detail.map(|m| m.giver_name.clone()).unwrap_or_default(),
+                giver_title: detail.map(|m| m.giver_title.clone()).unwrap_or_default(),
+                repeatable: detail.and_then(|m| m.repeatable),
+                faction_id: detail.map(|m| m.faction_id.clone()).unwrap_or_default(),
+                faction_name: detail.map(|m| m.faction_name.clone()).unwrap_or_default(),
+                chain_next: detail.map(|m| m.chain_next.clone()).unwrap_or_default(),
+                objectives_summary: detail
+                    .map(|m| m.objectives_summary.clone())
+                    .unwrap_or_default(),
+                progress_summary: detail
+                    .map(|m| m.progress_summary.clone())
+                    .unwrap_or_default(),
+                requirements_summary: detail
+                    .map(|m| m.requirements_summary.clone())
+                    .unwrap_or_default(),
+                rewards_summary: detail.map(|m| m.rewards_summary.clone()).unwrap_or_default(),
+            }
         })
         .collect()
 }
@@ -679,9 +726,29 @@ mod tests {
     }
 
     #[test]
-    fn map_runtime_state_storage_populated_from_stash_at_home_base() {
+    fn map_runtime_state_storage_populated_from_stash_at_current_poi() {
         let state = GameState {
             system: Some("sol".to_string()),
+            current_poi: Some("sol_station".to_string()),
+            home_base: Some("earth_base".to_string()),
+            docked: true,
+            stash: std::sync::Arc::new(std::collections::HashMap::from([(
+                "sol_station".to_string(),
+                std::collections::HashMap::from([("iron_ore".to_string(), 42i64)]),
+            )])),
+            ..GameState::default()
+        };
+
+        let dto = map_runtime_state(&state).expect("state should map");
+        assert!(dto.storage_items.contains_key("iron_ore"));
+        assert_eq!(dto.storage_items["iron_ore"].quantity, 42);
+    }
+
+    #[test]
+    fn map_runtime_state_storage_falls_back_to_home_base_when_current_poi_missing() {
+        let state = GameState {
+            system: Some("sol".to_string()),
+            current_poi: Some("sol_station".to_string()),
             home_base: Some("earth_base".to_string()),
             docked: true,
             stash: std::sync::Arc::new(std::collections::HashMap::from([(
@@ -798,6 +865,21 @@ mod tests {
             missions: std::sync::Arc::new(prayer_runtime::engine::MissionData {
                 active: vec!["active_1".to_string()],
                 available: vec!["avail_1".to_string()],
+                active_details: vec![prayer_runtime::engine::MissionInfoData {
+                    mission_id: "active_1".to_string(),
+                    title: "Welcome to Sol Central".to_string(),
+                    mission_type: "tutorial".to_string(),
+                    objectives_summary: "Dock at Sol Central".to_string(),
+                    ..prayer_runtime::engine::MissionInfoData::default()
+                }],
+                available_details: vec![prayer_runtime::engine::MissionInfoData {
+                    mission_id: "avail_1".to_string(),
+                    title: "First Haul".to_string(),
+                    description: "Deliver ore".to_string(),
+                    rewards_summary: "{\"credits\":500}".to_string(),
+                    ..prayer_runtime::engine::MissionInfoData::default()
+                }],
+                ..prayer_runtime::engine::MissionData::default()
             }),
             system: Some("sol".to_string()),
             ..GameState::default()
@@ -810,6 +892,9 @@ mod tests {
         assert_eq!(dto.available_missions[0].mission_id, "avail_1");
         assert!(dto.active_missions[0].completed);
         assert!(!dto.available_missions[0].completed);
+        assert_eq!(dto.active_missions[0].title, "Welcome to Sol Central");
+        assert_eq!(dto.active_missions[0].objectives_summary, "Dock at Sol Central");
+        assert_eq!(dto.available_missions[0].description, "Deliver ore");
     }
 
     #[test]
@@ -818,6 +903,7 @@ mod tests {
             missions: std::sync::Arc::new(prayer_runtime::engine::MissionData {
                 active: vec!["".to_string(), "  ".to_string()],
                 available: vec!["ok_1".to_string()],
+                ..prayer_runtime::engine::MissionData::default()
             }),
             system: Some("sol".to_string()),
             ..GameState::default()

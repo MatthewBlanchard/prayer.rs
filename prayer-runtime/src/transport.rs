@@ -5,7 +5,8 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use crate::engine::{
     CatalogEntryData, CommandArg, EngineCommand, EngineError, EngineExecutionResult, GalaxyData,
-    GameState, MarketData, MarketOrderInfo, MissionData, OpenOrderInfo, ShipState,
+    GameState, MarketData, MarketOrderInfo, MissionData, MissionInfoData, OpenOrderInfo,
+    ShipState,
 };
 use async_trait::async_trait;
 use reqwest::StatusCode;
@@ -726,8 +727,16 @@ fn map_status_to_game_state(value: &Value) -> GameState {
     let ship_ids = extract_ids(result.get("ships"));
     let recipe_ids = extract_ids(result.get("available_recipes"));
     let shipyard_listings = extract_ids(result.get("shipyard_listings"));
-    let active_missions = extract_ids(result.get("active_missions"));
-    let available_missions = extract_ids(result.get("available_missions"));
+    let active_missions = extract_mission_ids(
+        result
+            .get("active_missions")
+            .or_else(|| result.get("activeMissions")),
+    );
+    let available_missions = extract_mission_ids(
+        result
+            .get("available_missions")
+            .or_else(|| result.get("availableMissions")),
+    );
     let owned_ships = extract_ids(result.get("owned_ships"));
     let installed_modules = extract_ids(
         ship.get("installed_modules")
@@ -844,6 +853,8 @@ fn map_status_to_game_state(value: &Value) -> GameState {
         missions: Arc::new(MissionData {
             active: active_missions,
             available: available_missions,
+            active_details: Vec::new(),
+            available_details: Vec::new(),
         }),
         owned_ships: Arc::new(owned_ships),
         installed_modules: Arc::new(installed_modules),
@@ -1315,33 +1326,45 @@ fn enrich_from_view_orders(state: &mut GameState, value: &Value) {
 
 fn enrich_from_get_active_missions(state: &mut GameState, value: &Value) {
     let root = value.get("result").unwrap_or(value);
-    let ids = extract_mission_ids(
+    let details = extract_mission_details(
         root.get("missions")
             .or_else(|| root.get("active_missions"))
             .or_else(|| root.get("activeMissions")),
+        true,
     );
-    if ids.is_empty() {
+    if details.is_empty() {
         return;
     }
+    let ids = details
+        .iter()
+        .map(|mission| mission.mission_id.clone())
+        .collect::<Vec<_>>();
 
     let mut missions = state.missions.as_ref().clone();
     missions.active = ids;
+    missions.active_details = details;
     state.missions = Arc::new(missions);
 }
 
 fn enrich_from_get_missions(state: &mut GameState, value: &Value) {
     let root = value.get("result").unwrap_or(value);
-    let ids = extract_mission_ids(
+    let details = extract_mission_details(
         root.get("missions")
             .or_else(|| root.get("available_missions"))
             .or_else(|| root.get("availableMissions")),
+        false,
     );
-    if ids.is_empty() {
+    if details.is_empty() {
         return;
     }
+    let ids = details
+        .iter()
+        .map(|mission| mission.mission_id.clone())
+        .collect::<Vec<_>>();
 
     let mut missions = state.missions.as_ref().clone();
     missions.available = ids;
+    missions.available_details = details;
     state.missions = Arc::new(missions);
 }
 
@@ -1377,6 +1400,201 @@ fn extract_ids(value: Option<&Value>) -> Vec<String> {
 
 fn extract_mission_ids(value: Option<&Value>) -> Vec<String> {
     extract_named_ids(value, &["mission_id", "missionId", "id"])
+}
+
+fn extract_mission_details(value: Option<&Value>, active: bool) -> Vec<MissionInfoData> {
+    let Some(Value::Array(entries)) = value else {
+        return Vec::new();
+    };
+
+    entries
+        .iter()
+        .filter_map(|entry| extract_mission_detail(entry, active))
+        .collect()
+}
+
+fn extract_mission_detail(value: &Value, active: bool) -> Option<MissionInfoData> {
+    let Value::Object(map) = value else {
+        let Value::String(id) = value else {
+            return None;
+        };
+        let trimmed = id.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+        return Some(MissionInfoData {
+            id: trimmed.to_string(),
+            mission_id: trimmed.to_string(),
+            template_id: trimmed.to_string(),
+            title: trimmed.to_string(),
+            ..MissionInfoData::default()
+        });
+    };
+
+    let mission_id = map
+        .get("mission_id")
+        .or_else(|| map.get("missionId"))
+        .or_else(|| map.get("id"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .map(ToOwned::to_owned)?;
+
+    let template_id = map
+        .get("template_id")
+        .or_else(|| map.get("templateId"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .map(ToOwned::to_owned)
+        .unwrap_or_else(|| mission_id.clone());
+    let title = map
+        .get("title")
+        .or_else(|| map.get("name"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .map(ToOwned::to_owned)
+        .unwrap_or_else(|| mission_id.clone());
+    let progress_text = value_string(map.get("progress_text"))
+        .or_else(|| value_string(map.get("progressText")))
+        .or_else(|| {
+            map.get("percent_complete")
+                .or_else(|| map.get("percentComplete"))
+                .and_then(|v| number_as_f64(Some(v)))
+                .map(|pct| format!("{pct:.0}% complete"))
+        })
+        .unwrap_or_default();
+    let progress_summary = value_string(map.get("progress_summary"))
+        .or_else(|| value_string(map.get("progressSummary")))
+        .or_else(|| {
+            map.get("percent_complete")
+                .or_else(|| map.get("percentComplete"))
+                .and_then(|v| number_as_f64(Some(v)))
+                .map(|pct| format!("{pct:.0}% complete"))
+        })
+        .unwrap_or_default();
+    let objectives_summary = value_string(map.get("objectives_summary"))
+        .or_else(|| value_string(map.get("objectivesSummary")))
+        .or_else(|| summarize_array_descriptions(map.get("objectives")))
+        .unwrap_or_default();
+    let rewards_summary = value_string(map.get("rewards_summary"))
+        .or_else(|| value_string(map.get("rewardsSummary")))
+        .or_else(|| summarize_json_value(map.get("rewards")))
+        .unwrap_or_default();
+    let requirements_summary = value_string(map.get("requirements_summary"))
+        .or_else(|| value_string(map.get("requirementsSummary")))
+        .or_else(|| summarize_json_value(map.get("required_modules")))
+        .or_else(|| summarize_json_value(map.get("provided_items")))
+        .or_else(|| summarize_json_value(map.get("warnings")))
+        .unwrap_or_default();
+    let completed = map
+        .get("completed")
+        .or_else(|| map.get("is_completed"))
+        .or_else(|| map.get("isCompleted"))
+        .and_then(Value::as_bool)
+        .or_else(|| {
+            map.get("percent_complete")
+                .or_else(|| map.get("percentComplete"))
+                .and_then(|v| number_as_f64(Some(v)))
+                .map(|pct| pct >= 100.0)
+        })
+        .unwrap_or(!active);
+
+    Some(MissionInfoData {
+        id: mission_id.clone(),
+        mission_id,
+        template_id,
+        title,
+        mission_type: value_string(map.get("type")).unwrap_or_default(),
+        description: value_string(map.get("description")).unwrap_or_default(),
+        progress_text,
+        completed,
+        difficulty: map.get("difficulty").and_then(Value::as_i64),
+        expires_in_ticks: map
+            .get("expires_in_ticks")
+            .or_else(|| map.get("expiresInTicks"))
+            .and_then(Value::as_i64),
+        accepted_at: value_string(map.get("accepted_at"))
+            .or_else(|| value_string(map.get("acceptedAt")))
+            .unwrap_or_default(),
+        issuing_base: value_string(map.get("issuing_base"))
+            .or_else(|| value_string(map.get("issuingBase")))
+            .unwrap_or_default(),
+        issuing_base_id: value_string(map.get("issuing_base_id"))
+            .or_else(|| value_string(map.get("issuingBaseId")))
+            .unwrap_or_default(),
+        giver_name: map
+            .get("giver")
+            .and_then(Value::as_object)
+            .and_then(|giver| value_string(giver.get("name")))
+            .unwrap_or_default(),
+        giver_title: map
+            .get("giver")
+            .and_then(Value::as_object)
+            .and_then(|giver| value_string(giver.get("title")))
+            .unwrap_or_default(),
+        repeatable: map.get("repeatable").and_then(Value::as_bool),
+        faction_id: value_string(map.get("faction_id"))
+            .or_else(|| value_string(map.get("factionId")))
+            .unwrap_or_default(),
+        faction_name: value_string(map.get("faction_name"))
+            .or_else(|| value_string(map.get("factionName")))
+            .unwrap_or_default(),
+        chain_next: value_string(map.get("chain_next"))
+            .or_else(|| value_string(map.get("chainNext")))
+            .unwrap_or_default(),
+        objectives_summary,
+        progress_summary,
+        requirements_summary,
+        rewards_summary,
+    })
+}
+
+fn value_string(value: Option<&Value>) -> Option<String> {
+    value
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .map(ToOwned::to_owned)
+}
+
+fn summarize_array_descriptions(value: Option<&Value>) -> Option<String> {
+    let Value::Array(entries) = value? else {
+        return None;
+    };
+    let summaries = entries
+        .iter()
+        .filter_map(|entry| {
+            let Value::Object(map) = entry else {
+                return None;
+            };
+            value_string(map.get("description"))
+        })
+        .collect::<Vec<_>>();
+    if summaries.is_empty() {
+        None
+    } else {
+        Some(summaries.join("; "))
+    }
+}
+
+fn summarize_json_value(value: Option<&Value>) -> Option<String> {
+    let value = value?;
+    match value {
+        Value::Null => None,
+        Value::String(s) => {
+            let trimmed = s.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        }
+        Value::Array(entries) if entries.is_empty() => None,
+        Value::Object(map) if map.is_empty() => None,
+        _ => serde_json::to_string(value).ok(),
+    }
 }
 
 fn extract_named_ids(value: Option<&Value>, keys: &[&str]) -> Vec<String> {
@@ -1852,13 +2070,32 @@ mod tests {
         let payload = serde_json::json!({
             "result": {
                 "missions": [
-                    { "mission_id": "m_active_1" }
+                    {
+                        "mission_id": "m_active_1",
+                        "title": "Welcome to Sol Central",
+                        "description": "Dock at Sol Central",
+                        "type": "tutorial",
+                        "accepted_at": "2026-04-09T00:00:00Z",
+                        "issuing_base": "Sol Central",
+                        "issuing_base_id": "sol_central",
+                        "giver": { "name": "Controller", "title": "Station Ops" },
+                        "objectives": [
+                            { "description": "Dock at Sol Central" }
+                        ],
+                        "percent_complete": 100,
+                        "rewards": { "credits": 500 }
+                    }
                 ]
             }
         });
 
         enrich_from_get_active_missions(&mut state, &payload);
         assert_eq!(state.missions.active, vec!["m_active_1".to_string()]);
+        assert_eq!(state.missions.active_details.len(), 1);
+        assert_eq!(state.missions.active_details[0].title, "Welcome to Sol Central");
+        assert_eq!(state.missions.active_details[0].objectives_summary, "Dock at Sol Central");
+        assert_eq!(state.missions.active_details[0].progress_summary, "100% complete");
+        assert_eq!(state.missions.active_details[0].rewards_summary, "{\"credits\":500}");
     }
 
     #[test]
@@ -1867,13 +2104,28 @@ mod tests {
         let payload = serde_json::json!({
             "result": {
                 "missions": [
-                    { "mission_id": "m_avail_1" }
+                    {
+                        "mission_id": "m_avail_1",
+                        "title": "First Haul",
+                        "description": "Deliver ore",
+                        "type": "delivery",
+                        "faction_id": "confed",
+                        "faction_name": "Confederacy",
+                        "repeatable": true,
+                        "chain_next": "m_avail_2",
+                        "rewards": { "credits": 7500 }
+                    }
                 ]
             }
         });
 
         enrich_from_get_missions(&mut state, &payload);
         assert_eq!(state.missions.available, vec!["m_avail_1".to_string()]);
+        assert_eq!(state.missions.available_details.len(), 1);
+        assert_eq!(state.missions.available_details[0].title, "First Haul");
+        assert_eq!(state.missions.available_details[0].faction_name, "Confederacy");
+        assert_eq!(state.missions.available_details[0].repeatable, Some(true));
+        assert_eq!(state.missions.available_details[0].chain_next, "m_avail_2");
     }
 
     #[test]

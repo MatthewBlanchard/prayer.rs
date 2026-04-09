@@ -1,0 +1,127 @@
+# PrayerLang Reference
+
+This document describes the DSL currently implemented in `prayer-runtime`.
+
+## Script syntax
+
+Scripts are statement-based.
+
+- Command statements must end with `;`
+- `if` / `until` blocks use `{ ... }`
+- Line comments use `//`
+
+Example:
+
+```prayer
+// mine until cargo is full, then halt
+until CARGO_PCT() >= 100 {
+  mine;
+}
+halt;
+```
+
+## Control flow
+
+Control-flow keywords are case-sensitive:
+
+- `if`
+- `until`
+
+Examples:
+
+```prayer
+if MISSION_COMPLETE(mission_1) {
+  halt;
+}
+
+until FUEL() >= 50 {
+  refuel;
+}
+```
+
+## Conditions
+
+A condition is either:
+
+- A metric call, e.g. `MISSION_COMPLETE(m1)`
+- A comparison, e.g. `FUEL() >= 50`
+
+Supported operators:
+
+- `>`
+- `>=`
+- `<`
+- `<=`
+- `==`
+- `!=`
+
+## Arguments and tokens
+
+Command arguments are identifier-like tokens:
+
+- Plain: starts with `[A-Za-z0-9_]`, then `[A-Za-z0-9_-]*`
+- Macro/param ref: starts with `$`, then `[A-Za-z_]`, then `[A-Za-z0-9_-]*`
+
+Integer arguments are parsed as signed 64-bit integers where required.
+
+## MCP state lookup quick reference
+
+When answering direct state questions, inspect VFS state first.
+
+- Ship+location quick status: `/status.json`
+- Current system id: field `system` inside `/status.json`
+- System data (summary, POIs, stations): `/systems/{system_id}.json`
+- Resource information: found within individual POI entries in `/systems/{system_id}.json`
+
+Prefer direct `fs_read` on known paths. If required files are missing or empty, treat the requested data as unknown/unavailable in current state rather than guaranteed absent.
+Use `fs_index` when you need a current filesystem map before choosing paths.
+
+## Built-in macros
+
+Macros are resolved by analyzer/engine:
+
+- `$here`: resolved at script-load time to current system (error if unknown)
+- `$home`: dynamic at execution time
+- `$nearest_station`: dynamic at execution time
+
+Skill parameters are referenced as `$param_name`.
+
+## Skill library syntax
+
+Skill libraries support:
+
+- `skill`
+- `override ... when ...`
+- `@disable`
+
+Keywords are case-sensitive (`skill`, `override`, `when`, `@disable`).
+
+Example:
+
+```prayer
+@disable mine;
+
+skill travel(system: system_id) {
+  go $system;
+}
+
+override safety when FUEL() <= 5 {
+  halt;
+}
+```
+
+Notes:
+
+- `@disable` accepts optional trailing `;`
+- Skill parameter types:
+  - `any`
+  - `integer`
+  - `item_id`
+  - `system_id`
+  - `poi_id`
+  - `go_target`
+  - `ship_id`
+  - `listing_id`
+  - `mission_id`
+  - `module_id`
+  - `recipe_id`

@@ -349,7 +349,12 @@ impl SpaceMoltTransport {
             return Ok(result);
         }
         if let Some(item_id) = command_arg_text_at(command, 0) {
-            let quantity = state.cargo.get(item_id).copied().unwrap_or(0).max(1);
+            let quantity = state.cargo.get(item_id).copied().unwrap_or(0);
+            if quantity <= 0 {
+                return Ok(completed_with_message(format!(
+                    "No {item_id} in cargo to deposit."
+                )));
+            }
             let value = self
                 .execute_api(
                     "deposit_items",

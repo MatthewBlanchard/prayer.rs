@@ -634,6 +634,7 @@ mod tests {
             missions: std::sync::Arc::new(crate::engine::MissionData {
                 active: vec![],
                 available: vec!["rescue_op".to_string()],
+                ..crate::engine::MissionData::default()
             }),
             ..GameState::default()
         };
@@ -663,6 +664,7 @@ mod tests {
             missions: std::sync::Arc::new(crate::engine::MissionData {
                 active: vec!["active_op".to_string()],
                 available: vec![],
+                ..crate::engine::MissionData::default()
             }),
             ..GameState::default()
         };
