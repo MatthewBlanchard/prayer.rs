@@ -179,6 +179,34 @@ fn merge_map_vec_unique(
     }
 }
 
+fn diff_positive_item_deltas(
+    before: &HashMap<String, i64>,
+    after: &HashMap<String, i64>,
+) -> HashMap<String, i64> {
+    let mut deltas = HashMap::new();
+    for (item, after_qty) in after {
+        let before_qty = before.get(item).copied().unwrap_or(0);
+        let gained = after_qty - before_qty;
+        if gained > 0 {
+            deltas.insert(item.clone(), gained);
+        }
+    }
+    deltas
+}
+
+fn stash_totals_by_item(stash: &HashMap<String, HashMap<String, i64>>) -> HashMap<String, i64> {
+    let mut totals = HashMap::new();
+    for items in stash.values() {
+        for (item, qty) in items {
+            if *qty <= 0 {
+                continue;
+            }
+            *totals.entry(item.clone()).or_insert(0) += *qty;
+        }
+    }
+    totals
+}
+
 fn merge_knowledge_state(
     knowledge: &mut KnowledgeState,
     fetched: &GameState,
@@ -669,7 +697,7 @@ impl RuntimeService {
             format!("{} {}", command.action, command.args_as_strings().join(" "))
         };
         session.push_debug_log(format!("step: {command_text}"));
-        let (result, state_after, message) = match session
+        let (result, mut state_after, message) = match session
             .transport
             .execute(&command, Some(&current_state))
             .await
@@ -693,6 +721,20 @@ impl RuntimeService {
                 )
             }
         };
+        let mine_deltas = if command.action.eq_ignore_ascii_case("mine") {
+            diff_positive_item_deltas(current_state.cargo.as_ref(), state_after.cargo.as_ref())
+        } else {
+            HashMap::new()
+        };
+        let stash_deltas = if command.action.eq_ignore_ascii_case("stash") {
+            let before_stash = stash_totals_by_item(current_state.stash.as_ref());
+            let after_stash = stash_totals_by_item(state_after.stash.as_ref());
+            diff_positive_item_deltas(&before_stash, &after_stash)
+        } else {
+            HashMap::new()
+        };
+        state_after.last_mined = Arc::new(mine_deltas);
+        state_after.last_stashed = Arc::new(stash_deltas);
 
         let knowledge = {
             let mut knowledge = self.knowledge_state.write();
