@@ -42,7 +42,7 @@ pub const COMMAND_DOCS: &[(&str, &str)] = &[
     // Mining
     (
         "mine",
-        "Navigate to the nearest mining site and mine until cargo is full. Optionally filter by item type (e.g. iron_ore). Mining iron_ore might give you other ores too. Use stash; in mining loops.",
+        "Navigate to the nearest mining site and mine until cargo is full. Optionally filter by item type (e.g. iron_ore). Mining iron_ore might give you other ores too. Use stash; when mining.",
     ),
     // Missions
     (
