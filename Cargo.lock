@@ -1090,18 +1090,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "prayer-compat-adapter"
-version = "0.1.0"
-dependencies = [
- "axum",
- "prayer-api",
- "prayer-runtime",
- "serde",
- "serde_json",
- "uuid",
-]
-
-[[package]]
 name = "prayer-mcp"
 version = "0.1.0"
 dependencies = [
