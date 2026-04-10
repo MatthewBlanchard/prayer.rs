@@ -331,10 +331,16 @@ fn project_canonical_files(b: &mut VfsBuilder, state: &Value) {
     write_json_file(
         b,
         "/missions.json",
-        serde_json::json!({
-            "active": game.get("activeMissions").and_then(Value::as_array).cloned().unwrap_or_default(),
-            "available": game.get("availableMissions").and_then(Value::as_array).cloned().unwrap_or_default(),
-        }),
+        {
+            let active = game.get("activeMissions").and_then(Value::as_array).cloned();
+            let available = game.get("availableMissions").and_then(Value::as_array).cloned();
+            serde_json::json!({
+                "active_known": active.is_some(),
+                "active": active.unwrap_or_default(),
+                "available_known": available.is_some(),
+                "available": available.unwrap_or_default(),
+            })
+        },
     );
 
     // /station.json — only when docked
@@ -380,13 +386,15 @@ fn project_canonical_files(b: &mut VfsBuilder, state: &Value) {
         let systems = map
             .and_then(|m| m.get("systems"))
             .and_then(Value::as_array)
-            .cloned()
-            .unwrap_or_default();
+            .cloned();
+        let systems_known = systems.is_some();
+        let systems = systems.unwrap_or_default();
         let known_pois = map
             .and_then(|m| m.get("knownPois"))
             .and_then(Value::as_array)
-            .cloned()
-            .unwrap_or_default();
+            .cloned();
+        let known_pois_known = known_pois.is_some();
+        let known_pois = known_pois.unwrap_or_default();
 
         let mut all_system_ids: Vec<String> = Vec::new();
         let mut summary_by_system: BTreeMap<String, serde_json::Map<String, Value>> =
@@ -413,10 +421,11 @@ fn project_canonical_files(b: &mut VfsBuilder, state: &Value) {
                     ),
                     (
                         "neighbors".to_string(),
-                        system
-                            .get("connections")
-                            .cloned()
-                            .unwrap_or_else(|| serde_json::json!([])),
+                        system.get("connections").cloned().unwrap_or(Value::Null),
+                    ),
+                    (
+                        "neighbors_known".to_string(),
+                        Value::Bool(system.get("connections").is_some()),
                     ),
                 ]),
             );
@@ -466,7 +475,8 @@ fn project_canonical_files(b: &mut VfsBuilder, state: &Value) {
                             ("system_id".to_string(), Value::String(sid.to_string())),
                             ("x".to_string(), Value::Null),
                             ("y".to_string(), Value::Null),
-                            ("neighbors".to_string(), serde_json::json!([])),
+                            ("neighbors".to_string(), Value::Null),
+                            ("neighbors_known".to_string(), Value::Bool(false)),
                         ]),
                     );
                 }
@@ -476,8 +486,10 @@ fn project_canonical_files(b: &mut VfsBuilder, state: &Value) {
         all_system_ids.dedup();
 
         let mut poi_to_resources: HashMap<String, Vec<String>> = HashMap::new();
+        let mut pois_by_resource_known = false;
         if let Some(resources) = galaxy.get("resources").and_then(Value::as_object) {
             if let Some(by_resource) = resources.get("poisByResource").and_then(Value::as_object) {
+                pois_by_resource_known = true;
                 for (resource_id, pois) in by_resource {
                     if let Some(poi_arr) = pois.as_array() {
                         for poi in poi_arr {
@@ -494,7 +506,8 @@ fn project_canonical_files(b: &mut VfsBuilder, state: &Value) {
             }
         }
 
-        if let Some(exploration) = galaxy.get("exploration").and_then(Value::as_object) {
+        let exploration = galaxy.get("exploration").and_then(Value::as_object);
+        if let Some(exploration) = exploration {
             for (field, path) in [
                 ("exploredSystems", "/exploration/explored_systems.json"),
                 ("visitedPois", "/exploration/visited_pois.json"),
@@ -510,6 +523,24 @@ fn project_canonical_files(b: &mut VfsBuilder, state: &Value) {
                 );
             }
         }
+        write_json_file(
+            b,
+            "/exploration/meta.json",
+            serde_json::json!({
+                "explored_systems_known": exploration
+                    .and_then(|e| e.get("exploredSystems"))
+                    .and_then(Value::as_array)
+                    .is_some(),
+                "visited_pois_known": exploration
+                    .and_then(|e| e.get("visitedPois"))
+                    .and_then(Value::as_array)
+                    .is_some(),
+                "surveyed_systems_known": exploration
+                    .and_then(|e| e.get("surveyedSystems"))
+                    .and_then(Value::as_array)
+                    .is_some(),
+            }),
+        );
 
         let mut dockable_by_system: BTreeMap<String, Vec<Value>> = BTreeMap::new();
         let mut station_by_system: BTreeMap<String, Vec<Value>> = BTreeMap::new();
@@ -531,6 +562,7 @@ fn project_canonical_files(b: &mut VfsBuilder, state: &Value) {
                 "has_base": poi.get("hasBase"),
                 "x": poi.get("x"),
                 "y": poi.get("y"),
+                "resources_known": pois_by_resource_known,
                 "resources": poi_to_resources.get(pid).cloned().unwrap_or_default(),
             });
             dockable_by_system
@@ -551,10 +583,23 @@ fn project_canonical_files(b: &mut VfsBuilder, state: &Value) {
             let stations = station_by_system.get(sid).cloned().unwrap_or_default();
 
             if let Some(summary) = summary_by_system.get_mut(sid) {
-                summary.insert("pois_count".to_string(), serde_json::json!(pois.len()));
+                summary.insert("systems_known".to_string(), Value::Bool(systems_known));
+                summary.insert("pois_known".to_string(), Value::Bool(known_pois_known));
+                summary.insert(
+                    "pois_count".to_string(),
+                    if known_pois_known {
+                        serde_json::json!(pois.len())
+                    } else {
+                        Value::Null
+                    },
+                );
                 summary.insert(
                     "stations_count".to_string(),
-                    serde_json::json!(stations.len()),
+                    if known_pois_known {
+                        serde_json::json!(stations.len())
+                    } else {
+                        Value::Null
+                    },
                 );
             }
 
@@ -563,11 +608,27 @@ fn project_canonical_files(b: &mut VfsBuilder, state: &Value) {
                 &format!("/systems/{}.json", encode_segment(sid)),
                 serde_json::json!({
                     "summary": summary_by_system.get(sid),
+                    "systems_known": systems_known,
+                    "pois_known": known_pois_known,
                     "pois": pois,
                     "stations": stations,
                 }),
             );
         }
+
+        write_json_file(
+            b,
+            "/systems/meta.json",
+            serde_json::json!({
+                "systems_known": systems_known,
+                "pois_known": known_pois_known,
+                "system_count": if systems_known {
+                    serde_json::json!(all_system_ids.len())
+                } else {
+                    Value::Null
+                },
+            }),
+        );
     }
 }
 
