@@ -1,7 +1,29 @@
 import { useState } from "react";
 import { AgentFeedItem, AgentInfo } from "../shared/types.js";
 
-export type AgentState = AgentInfo & { feed: AgentFeedItem[] };
+export type RunningScript = {
+  script: string;
+  currentLine: number | null;
+};
+
+export type AgentState = AgentInfo & { feed: AgentFeedItem[]; runningScript: RunningScript | null };
+
+function ScriptViewer({ script, currentLine }: { script: string; currentLine: number | null }) {
+  const lines = script.split("\n");
+  return (
+    <div className="agent-script-viewer">
+      {lines.map((line, i) => {
+        const active = currentLine !== null && i === currentLine;
+        return (
+          <div key={i} className={`agent-script-line${active ? " agent-script-line--active" : ""}`}>
+            <span className="agent-script-lineno">{i + 1}</span>
+            <span className="agent-script-text">{line || "\u00a0"}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 interface AgentCardProps {
   agent: AgentState;
@@ -58,24 +80,28 @@ function AgentCard({ agent, onPause, onResume, onObjective }: AgentCardProps) {
         </div>
       )}
 
-      <div className="agent-feed">
-        {agent.feed.length === 0 && (
-          <div className="agent-feed-empty">no activity yet</div>
-        )}
-        {agent.feed.map((item, i) => {
-          if (item.kind === "error") {
+      {agent.runningScript ? (
+        <ScriptViewer script={agent.runningScript.script} currentLine={agent.runningScript.currentLine} />
+      ) : (
+        <div className="agent-feed">
+          {agent.feed.length === 0 && (
+            <div className="agent-feed-empty">no activity yet</div>
+          )}
+          {agent.feed.map((item, i) => {
+            if (item.kind === "error") {
+              return (
+                <div key={i} className="agent-feed-error">{item.message}</div>
+              );
+            }
             return (
-              <div key={i} className="agent-feed-error">{item.message}</div>
+              <div key={i} className={`agent-feed-tool agent-feed-tool--${item.status}`}>
+                <span className="agent-feed-tool-status">[{item.status}]</span>
+                <span className="agent-feed-tool-name">{item.name}</span>
+              </div>
             );
-          }
-          return (
-            <div key={i} className={`agent-feed-tool agent-feed-tool--${item.status}`}>
-              <span className="agent-feed-tool-status">[{item.status}]</span>
-              <span className="agent-feed-tool-name">{item.name}</span>
-            </div>
-          );
-        })}
-      </div>
+          })}
+        </div>
+      )}
     </div>
   );
 }

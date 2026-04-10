@@ -24,6 +24,7 @@ function parseArgs(): {
   llmBaseUrl: string;
   apiKey: string;
   mcpUrl: string;
+  prayerApiUrl: string;
   mcpRequestTimeoutMs: number;
   port: number;
 } {
@@ -83,12 +84,19 @@ function parseArgs(): {
     process.exit(1);
   }
 
+  const prayerApiUrl = get(
+    "--prayer-api-url",
+    "PRAYER_MCP_CLIENT_API_URL",
+    "http://127.0.0.1:3000"
+  );
+
   return {
     provider,
     model,
     llmBaseUrl,
     apiKey,
     mcpUrl,
+    prayerApiUrl,
     mcpRequestTimeoutMs,
     port,
   };
@@ -152,6 +160,40 @@ function broadcast(event: ToolLoopEvent, source = "commander"): void {
 }
 
 // ---------------------------------------------------------------------------
+// Prayer API proxy (resolves handle → UUID, fetches snapshots)
+// ---------------------------------------------------------------------------
+
+class PrayerApiProxy {
+  private labelToId = new Map<string, string>();
+
+  constructor(private readonly baseUrl: string) {}
+
+  private async refreshSessions(): Promise<void> {
+    const res = await fetch(`${this.baseUrl}/api/runtime/sessions`);
+    if (!res.ok) return;
+    const sessions = (await res.json()) as Array<Record<string, unknown>>;
+    this.labelToId.clear();
+    for (const s of sessions) {
+      const label = s["label"] as string | undefined;
+      const id = s["id"] as string | undefined;
+      if (label && id) this.labelToId.set(label, id);
+    }
+  }
+
+  async getSnapshot(handle: string): Promise<Record<string, unknown> | null> {
+    let id = this.labelToId.get(handle);
+    if (!id) {
+      await this.refreshSessions();
+      id = this.labelToId.get(handle);
+    }
+    if (!id) return null;
+    const res = await fetch(`${this.baseUrl}/api/runtime/sessions/${id}/snapshot`);
+    if (!res.ok) return null;
+    return res.json() as Promise<Record<string, unknown>>;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -162,6 +204,7 @@ async function main(): Promise<void> {
     llmBaseUrl,
     apiKey,
     mcpUrl,
+    prayerApiUrl,
     mcpRequestTimeoutMs,
     port,
   } = parseArgs();
@@ -192,6 +235,8 @@ async function main(): Promise<void> {
   await playerManager.syncSessions();
   playerManager.startSyncInterval();
   console.log("Player agent manager started.");
+
+  const prayerProxy = new PrayerApiProxy(prayerApiUrl);
 
   const systemPrompt = buildSystemPrompt(
     loop.getBootstrapReference(),
@@ -341,6 +386,16 @@ async function main(): Promise<void> {
   app.post("/api/agents/sync", async (_req: Request, res: Response) => {
     await playerManager.syncSessions();
     res.json(playerManager.listAgents());
+  });
+
+  app.get("/api/agents/:handle/snapshot", async (req: Request, res: Response) => {
+    const handle = req.params["handle"] ?? "";
+    const snapshot = await prayerProxy.getSnapshot(handle);
+    if (!snapshot) {
+      res.status(404).json({ error: `no session found for "${handle}"` });
+      return;
+    }
+    res.json(snapshot);
   });
 
   app.post("/api/agents/:handle/pause", (req: Request, res: Response) => {

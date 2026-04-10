@@ -90,3 +90,26 @@ export async function setAgentObjective(handle: string, objective: string): Prom
     body: JSON.stringify({ objective }),
   });
 }
+
+export type AgentSnapshot = {
+  currentScript: string | null;
+  currentScriptLine: number | null;
+  isHalted: boolean;
+};
+
+export async function fetchAgentSnapshot(handle: string): Promise<AgentSnapshot | null> {
+  try {
+    const res = await fetch(`/api/agents/${encodeURIComponent(handle)}/snapshot`);
+    if (!res.ok) return null;
+    const data = (await res.json()) as { snapshot?: Record<string, unknown> };
+    const snap = data["snapshot"];
+    if (!snap) return null;
+    return {
+      currentScript: (snap["currentScript"] as string | null) ?? null,
+      currentScriptLine: (snap["currentScriptLine"] as number | null) ?? null,
+      isHalted: (snap["isHalted"] as boolean) ?? false,
+    };
+  } catch {
+    return null;
+  }
+}

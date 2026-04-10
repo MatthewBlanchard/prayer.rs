@@ -514,3 +514,40 @@ html, body, #root {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Script viewer */
+.agent-script-viewer {
+  font-size: 11px;
+  max-height: 160px;
+  overflow-y: auto;
+  padding: 4px 0;
+  background: var(--bg);
+}
+
+.agent-script-line {
+  display: flex;
+  gap: 6px;
+  padding: 0 8px;
+  line-height: 1.6;
+}
+
+.agent-script-line--active {
+  background: color-mix(in srgb, var(--yellow) 15%, transparent);
+}
+
+.agent-script-lineno {
+  flex-shrink: 0;
+  color: var(--text-faint);
+  user-select: none;
+  min-width: 18px;
+  text-align: right;
+}
+
+.agent-script-text {
+  color: var(--text-dim);
+  white-space: pre;
+}
+
+.agent-script-line--active .agent-script-text {
+  color: var(--yellow);
+}

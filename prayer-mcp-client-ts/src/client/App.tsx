@@ -1,6 +1,7 @@
 import { useEffect, useReducer, useRef, useState } from "react";
 import {
   connectEvents,
+  fetchAgentSnapshot,
   fetchAgents,
   pauseAgent,
   resumeAgent,
@@ -213,11 +214,12 @@ export default function App() {
   const [agents, setAgents] = useState<AgentState[]>([]);
   const [inputError, setInputError] = useState<string | null>(null);
   const pendingUserMsg = useRef<string | null>(null);
+  const scriptPollers = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
 
   // Load initial agent list
   useEffect(() => {
     fetchAgents().then((list) =>
-      setAgents(list.map((a) => ({ ...a, feed: [] })))
+      setAgents(list.map((a) => ({ ...a, feed: [], runningScript: null })))
     ).catch(() => {});
   }, []);
 
@@ -229,6 +231,35 @@ export default function App() {
 
         if (isPlayerEvent) {
           setAgents((prev) => applyAgentEvent(prev, source, event));
+
+          if (event.type === "tool_call_started" && event.name === "run_script") {
+            const poll = () => {
+              fetchAgentSnapshot(source).then((snap) => {
+                setAgents((prev) => prev.map((a) =>
+                  a.sessionHandle !== source ? a : {
+                    ...a,
+                    runningScript: snap?.currentScript && !snap.isHalted
+                      ? { script: snap.currentScript, currentLine: snap.currentScriptLine }
+                      : null,
+                  }
+                ));
+              }).catch(() => {});
+            };
+            poll();
+            scriptPollers.current.set(source, setInterval(poll, 10_000));
+          }
+
+          if (event.type === "tool_call_completed" && event.name === "run_script") {
+            const timer = scriptPollers.current.get(source);
+            if (timer !== undefined) {
+              clearInterval(timer);
+              scriptPollers.current.delete(source);
+            }
+            setAgents((prev) => prev.map((a) =>
+              a.sessionHandle !== source ? a : { ...a, runningScript: null }
+            ));
+          }
+
           return;
         }
 
@@ -320,7 +351,7 @@ export default function App() {
     setAgents((prev) => {
       const next = list.map((a) => {
         const existing = prev.find((p) => p.sessionHandle === a.sessionHandle);
-        return existing ? { ...existing, paused: a.paused } : { ...a, feed: [] };
+        return existing ? { ...existing, paused: a.paused } : { ...a, feed: [], runningScript: null };
       });
       return next;
     });
