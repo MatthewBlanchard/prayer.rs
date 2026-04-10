@@ -5,7 +5,7 @@ import {
   Message,
   ToolDef,
 } from "./llm.js";
-import { extractUriArgument, McpClient, McpTool, parseJsonObject } from "./mcp.js";
+import { extractUriArgument, IMcpClient, McpTool, parseJsonObject } from "./mcp.js";
 
 const READ_RESOURCE_TOOL_NAME = "read_resource";
 const LIST_SESSIONS_TOOL_NAME = "list_sessions";
@@ -26,7 +26,7 @@ export interface CompactionConfig {
 
 export const defaultCompactionConfig: CompactionConfig = {
   enabled: true,
-  estimatedContextWindow: 128_000,
+  estimatedContextWindow: 256_000,
   contextBudgetRatio: 0.55,
   minRecentMessages: 10,
   charsPerToken: 4,
@@ -103,7 +103,7 @@ export class ChatToolLoop {
 
   constructor(
     private readonly provider: CompletionProvider,
-    private readonly mcp: McpClient,
+    private readonly mcp: IMcpClient,
     private readonly model: string | undefined,
     private readonly config: LoopConfig
   ) {}

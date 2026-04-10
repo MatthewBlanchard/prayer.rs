@@ -7,7 +7,14 @@ export interface McpTool {
   inputSchema: Record<string, unknown>;
 }
 
-export class McpClient {
+export interface IMcpClient {
+  listTools(): Promise<McpTool[]>;
+  callTool(name: string, args: Record<string, unknown>): Promise<{ text: string; isError: boolean }>;
+  readResource(uri: string): Promise<string>;
+  close(): Promise<void>;
+}
+
+export class McpClient implements IMcpClient {
   private client: Client;
   private connected = false;
 
