@@ -268,6 +268,9 @@ export class ChatToolLoop {
         return await this.provider.complete(request);
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err));
+        if (err instanceof CompletionError && err.body) {
+          console.error(`[tool_loop] provider error ${err.status}: ${err.body}`);
+        }
         if (attempt + 1 < this.config.maxRetries) {
           const delayMs = this.config.retryBaseDelayMs * Math.pow(2, attempt);
           await sleep(delayMs);

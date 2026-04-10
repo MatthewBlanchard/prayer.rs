@@ -1,4 +1,4 @@
-import { CompletionProvider, Message } from "./llm.js";
+import { CompletionError, CompletionProvider, Message } from "./llm.js";
 import { IMcpClient } from "./mcp.js";
 import { SessionScopedMcpProxy } from "./session_proxy.js";
 import {
@@ -76,14 +76,17 @@ export class PlayerAgent {
       },
     ];
     this.compaction = newCompactionState();
+    // Start paused — waits for an objective before calling the LLM
+    this.pause();
   }
 
   setObjective(objective: string): void {
     this.objective = objective;
     this.messages.push({
       role: "user",
-      content: `## Updated Objective\n${objective}`,
+      content: objective,
     });
+    this.resume();
   }
 
   pause(): void {
@@ -129,7 +132,11 @@ export class PlayerAgent {
           this.onEvent(this.sessionHandle, event);
         });
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
+        let message = err instanceof Error ? err.message : String(err);
+        if (err instanceof CompletionError && err.body) {
+          message += ` — ${err.body}`;
+        }
+        console.error(`[player-agent:${this.sessionHandle}]`, message);
         this.onEvent(this.sessionHandle, { type: "error", message });
         await sleep(ERROR_BACKOFF_MS);
         continue;
