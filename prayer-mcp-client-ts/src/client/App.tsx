@@ -1,8 +1,19 @@
 import { useEffect, useReducer, useRef, useState } from "react";
-import { connectEvents, resetConversation, sendMessage, ServerEvent } from "./api.js";
+import {
+  connectEvents,
+  fetchAgents,
+  pauseAgent,
+  resumeAgent,
+  resetConversation,
+  sendMessage,
+  setAgentObjective,
+  syncAgents,
+  ServerEvent,
+} from "./api.js";
 import ChatPane from "./ChatPane.js";
 import InputBar from "./InputBar.js";
-import { TranscriptItem } from "../shared/types.js";
+import AgentsPanel, { AgentState } from "./AgentsPanel.js";
+import { AgentFeedItem, TranscriptItem } from "../shared/types.js";
 
 // ---------------------------------------------------------------------------
 // State management
@@ -153,6 +164,41 @@ function reducer(state: AppState, action: Action): AppState {
 }
 
 // ---------------------------------------------------------------------------
+// Agent state helpers
+// ---------------------------------------------------------------------------
+
+const MAX_FEED_ITEMS = 30;
+
+function applyAgentEvent(agents: AgentState[], source: string, event: ServerEvent): AgentState[] {
+  return agents.map((a) => {
+    if (a.sessionHandle !== source) return a;
+
+    let feed = [...a.feed];
+
+    if (event.type === "tool_call_started") {
+      const item: AgentFeedItem = {
+        kind: "tool_call",
+        toolCallId: event.toolCallId,
+        name: event.name,
+        status: "running",
+        resultPreview: null,
+      };
+      feed = [...feed, item].slice(-MAX_FEED_ITEMS);
+    } else if (event.type === "tool_call_completed") {
+      feed = feed.map((f) =>
+        f.kind === "tool_call" && f.toolCallId === event.toolCallId
+          ? { ...f, status: event.outcome, resultPreview: event.resultPreview }
+          : f
+      );
+    } else if (event.type === "error") {
+      feed = [...feed, { kind: "error" as const, message: event.message }].slice(-MAX_FEED_ITEMS);
+    }
+
+    return { ...a, feed };
+  });
+}
+
+// ---------------------------------------------------------------------------
 // App
 // ---------------------------------------------------------------------------
 
@@ -164,12 +210,28 @@ export default function App() {
     status: "Connecting...",
   });
 
+  const [agents, setAgents] = useState<AgentState[]>([]);
   const [inputError, setInputError] = useState<string | null>(null);
   const pendingUserMsg = useRef<string | null>(null);
+
+  // Load initial agent list
+  useEffect(() => {
+    fetchAgents().then((list) =>
+      setAgents(list.map((a) => ({ ...a, feed: [] })))
+    ).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const disconnect = connectEvents(
       (event: ServerEvent) => {
+        const source = (event as Record<string, unknown>)["source"] as string | undefined;
+        const isPlayerEvent = source && source !== "commander";
+
+        if (isPlayerEvent) {
+          setAgents((prev) => applyAgentEvent(prev, source, event));
+          return;
+        }
+
         switch (event.type) {
           case "state_sync":
             dispatch({
@@ -239,6 +301,31 @@ export default function App() {
     }
   }
 
+  async function handlePause(handle: string) {
+    setAgents((prev) => prev.map((a) => a.sessionHandle === handle ? { ...a, paused: true } : a));
+    await pauseAgent(handle);
+  }
+
+  async function handleResume(handle: string) {
+    setAgents((prev) => prev.map((a) => a.sessionHandle === handle ? { ...a, paused: false } : a));
+    await resumeAgent(handle);
+  }
+
+  async function handleObjective(handle: string, objective: string) {
+    await setAgentObjective(handle, objective);
+  }
+
+  async function handleSync() {
+    const list = await syncAgents();
+    setAgents((prev) => {
+      const next = list.map((a) => {
+        const existing = prev.find((p) => p.sessionHandle === a.sessionHandle);
+        return existing ? { ...existing, paused: a.paused } : { ...a, feed: [] };
+      });
+      return next;
+    });
+  }
+
   const modelLabel = state.model ? ` [${state.model}]` : "";
 
   return (
@@ -250,13 +337,23 @@ export default function App() {
         </span>
       </header>
 
-      <ChatPane items={state.items} busy={state.busy} />
-
-      <InputBar
-        onSubmit={handleSubmit}
-        disabled={state.busy}
-        error={inputError}
-      />
+      <div className="app-body">
+        <div className="app-chat">
+          <ChatPane items={state.items} busy={state.busy} />
+          <InputBar
+            onSubmit={handleSubmit}
+            disabled={state.busy}
+            error={inputError}
+          />
+        </div>
+        <AgentsPanel
+          agents={agents}
+          onPause={handlePause}
+          onResume={handleResume}
+          onObjective={handleObjective}
+          onSync={handleSync}
+        />
+      </div>
     </div>
   );
 }

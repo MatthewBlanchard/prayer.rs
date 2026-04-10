@@ -1,4 +1,4 @@
-import { ToolLoopEvent } from "../shared/types.js";
+import { AgentInfo, ToolLoopEvent } from "../shared/types.js";
 
 export type StateSyncEvent = {
   type: "state_sync";
@@ -61,4 +61,32 @@ export async function sendMessage(content: string): Promise<void> {
 
 export async function resetConversation(): Promise<void> {
   await fetch("/api/reset", { method: "POST" });
+}
+
+export async function fetchAgents(): Promise<AgentInfo[]> {
+  const res = await fetch("/api/agents");
+  if (!res.ok) return [];
+  return res.json() as Promise<AgentInfo[]>;
+}
+
+export async function syncAgents(): Promise<AgentInfo[]> {
+  const res = await fetch("/api/agents/sync", { method: "POST" });
+  if (!res.ok) return [];
+  return res.json() as Promise<AgentInfo[]>;
+}
+
+export async function pauseAgent(handle: string): Promise<void> {
+  await fetch(`/api/agents/${encodeURIComponent(handle)}/pause`, { method: "POST" });
+}
+
+export async function resumeAgent(handle: string): Promise<void> {
+  await fetch(`/api/agents/${encodeURIComponent(handle)}/resume`, { method: "POST" });
+}
+
+export async function setAgentObjective(handle: string, objective: string): Promise<void> {
+  await fetch(`/api/agents/${encodeURIComponent(handle)}/objective`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ objective }),
+  });
 }
