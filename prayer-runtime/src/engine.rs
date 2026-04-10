@@ -183,6 +183,8 @@ pub struct RuntimeSnapshot {
     pub script: String,
     /// Halt state.
     pub is_halted: bool,
+    /// Whether the script ran to natural completion (all frames exhausted, no explicit halt).
+    pub is_finished: bool,
     /// Current script line.
     pub current_script_line: Option<usize>,
     /// Active frame kinds.
@@ -204,6 +206,9 @@ pub struct EngineCheckpoint {
     pub script: String,
     /// Halted state.
     pub is_halted: bool,
+    /// Whether the script ran to natural completion.
+    #[serde(default)]
+    pub is_finished: bool,
     /// Current script line.
     pub current_script_line: Option<usize>,
     /// Serialized execution frames.
@@ -258,6 +263,7 @@ pub struct RuntimeEngine {
     mined_by_item: HashMap<String, i64>,
     stashed_by_item: HashMap<String, i64>,
     is_halted: bool,
+    is_finished: bool,
     current_script_line: Option<usize>,
     events: Vec<RuntimeEvent>,
     bool_predicates: HashMap<String, BoolPredicate>,
@@ -297,6 +303,7 @@ impl RuntimeEngine {
             mined_by_item: HashMap::new(),
             stashed_by_item: HashMap::new(),
             is_halted: false,
+            is_finished: false,
             current_script_line: None,
             events: Vec::new(),
             bool_predicates: HashMap::new(),
@@ -347,6 +354,7 @@ impl RuntimeEngine {
         self.mined_by_item.clear();
         self.stashed_by_item.clear();
         self.is_halted = false;
+        self.is_finished = false;
         self.current_script_line = None;
         self.events.push(RuntimeEvent::ScriptLoaded);
 
@@ -376,6 +384,7 @@ impl RuntimeEngine {
         loop {
             let Some(frame_idx) = self.frames.len().checked_sub(1) else {
                 self.is_halted = true;
+                self.is_finished = true;
                 self.events
                     .push(RuntimeEvent::Halted("script complete".to_string()));
                 return Ok(None);
@@ -532,6 +541,7 @@ impl RuntimeEngine {
     /// Resume runtime execution.
     pub fn resume(&mut self, reason: &str) {
         self.is_halted = false;
+        self.is_finished = false;
         self.events.push(RuntimeEvent::Resumed(reason.to_string()));
     }
 
@@ -545,6 +555,7 @@ impl RuntimeEngine {
         RuntimeSnapshot {
             script: self.script_source.clone(),
             is_halted: self.is_halted,
+            is_finished: self.is_finished,
             current_script_line: self.current_script_line,
             frame_stack: self.frames.iter().map(|f| f.kind).collect(),
             memory: self.memory.iter().cloned().collect(),
@@ -559,6 +570,7 @@ impl RuntimeEngine {
             version: 1,
             script: self.script_source.clone(),
             is_halted: self.is_halted,
+            is_finished: self.is_finished,
             current_script_line: self.current_script_line,
             frames: self.frames.clone(),
             requeued_steps: self.requeued_steps.iter().cloned().collect(),
@@ -579,6 +591,7 @@ impl RuntimeEngine {
 
         self.set_script(&checkpoint.script, None)?;
         self.is_halted = checkpoint.is_halted;
+        self.is_finished = checkpoint.is_finished;
         self.current_script_line = checkpoint.current_script_line;
 
         self.frames = checkpoint.frames;

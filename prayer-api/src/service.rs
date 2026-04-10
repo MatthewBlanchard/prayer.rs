@@ -796,7 +796,6 @@ impl RuntimeService {
         let _ = std::fs::write(DEBUG_LOG_PATH, "run started\n");
         let max_steps = max_steps.unwrap_or(DEFAULT_EXECUTE_MAX_STEPS);
         let mut steps_executed = 0usize;
-        let mut completed = false;
         let mut error: Option<String> = None;
         let mut halt_message: Option<String> = None;
 
@@ -821,7 +820,6 @@ impl RuntimeService {
                 Err(err) => return Err(err),
             };
             if !step.executed {
-                completed = !step.halted;
                 break;
             }
             steps_executed += 1;
@@ -835,7 +833,7 @@ impl RuntimeService {
         Ok(ExecuteScriptResponse {
             steps_executed,
             halted: snapshot.is_halted,
-            completed,
+            completed: snapshot.is_finished,
             error,
             halt_message,
         })
