@@ -103,6 +103,20 @@ pub struct FsLsInput {
     pub path: Option<String>,
 }
 
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct GetSkillsLibraryInput {
+    /// Target session handle (playerName from list_sessions).
+    pub session_handle: String,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct SetSkillsLibraryInput {
+    /// Target session handle (playerName from list_sessions).
+    pub session_handle: String,
+    /// Skill/override library text.
+    pub text: String,
+}
+
 // ── server struct ─────────────────────────────────────────────────────────────
 
 /// The MCP server: holds the API client, resource handler, and tool router.
@@ -461,5 +475,46 @@ impl PrayerMcpServer {
         self.resources
             .fs_ls(&session_id, path.as_deref().unwrap_or("/"))
             .await
+    }
+
+    #[tool(description = "Get the canonicalized skill/override library text for session_handle")]
+    async fn get_skills_library(
+        &self,
+        Parameters(GetSkillsLibraryInput { session_handle }): Parameters<GetSkillsLibraryInput>,
+    ) -> Result<String, String> {
+        let session_id = self.resolve_session_id_or_error(&session_handle).await?;
+        let v = self
+            .client
+            .get_skills(&session_id)
+            .await
+            .map_err(|e| format!("error: {e}"))?;
+        let payload = serde_json::json!({
+            "session_handle": session_handle,
+            "library": v,
+        });
+        Ok(serde_json::to_string_pretty(&payload).unwrap_or_default())
+    }
+
+    #[tool(
+        description = "Set the skill/override library text for session_handle and return canonicalized text"
+    )]
+    async fn set_skills_library(
+        &self,
+        Parameters(SetSkillsLibraryInput {
+            session_handle,
+            text,
+        }): Parameters<SetSkillsLibraryInput>,
+    ) -> Result<String, String> {
+        let session_id = self.resolve_session_id_or_error(&session_handle).await?;
+        let v = self
+            .client
+            .set_skills(&session_id, &text)
+            .await
+            .map_err(|e| format!("error: {e}"))?;
+        let payload = serde_json::json!({
+            "session_handle": session_handle,
+            "library": v,
+        });
+        Ok(serde_json::to_string_pretty(&payload).unwrap_or_default())
     }
 }

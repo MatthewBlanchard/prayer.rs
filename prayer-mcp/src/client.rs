@@ -200,6 +200,23 @@ impl PrayerApiClient {
         .await
     }
 
+    /// `GET /api/runtime/sessions/:id/skills`
+    pub async fn get_skills(&self, session_id: &str) -> Result<Value, ClientError> {
+        self.get(&format!("/api/runtime/sessions/{session_id}/skills"))
+            .await
+    }
+
+    /// `POST /api/runtime/sessions/:id/skills`
+    pub async fn set_skills(&self, session_id: &str, text: &str) -> Result<Value, ClientError> {
+        let body = serde_json::json!({ "text": text });
+        self.post_body_raw_with_endpoint(
+            &format!("/api/runtime/sessions/{session_id}/skills"),
+            &body,
+            "/api/runtime/sessions/:id/skills",
+        )
+        .await
+    }
+
     /// `GET /api/runtime/sessions/:id/state` — returns body + `X-Prayer-State-Version`.
     pub async fn get_state(
         &self,
