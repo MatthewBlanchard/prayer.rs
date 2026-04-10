@@ -33,6 +33,20 @@ export type AgentFeedItem =
   | { kind: "tool_call"; toolCallId: string; name: string; status: "running" | "ok" | "error"; resultPreview: string | null }
   | { kind: "error"; message: string };
 
+export type AgentMindMessage = {
+  role: string;
+  content: string | null;
+  toolCallId?: string;
+  isError?: boolean;
+  toolCalls?: Array<{ id: string; name: string; arguments: string }>;
+};
+
+export type AgentMindSnapshot = {
+  objective: string;
+  compactionSummary: string | null;
+  messages: AgentMindMessage[];
+};
+
 // Chat transcript items for rendering
 export type TranscriptItem =
   | { kind: "user"; content: string }

@@ -12,6 +12,21 @@ import {
 const IDLE_SLEEP_MS = 5_000;
 const ERROR_BACKOFF_MS = 15_000;
 const SESSION_SYNC_INTERVAL_MS = 60_000;
+const DEFAULT_MIND_HISTORY_LIMIT = 60;
+
+export type AgentMindMessage = {
+  role: string;
+  content: string | null;
+  toolCallId?: string;
+  isError?: boolean;
+  toolCalls?: Array<{ id: string; name: string; arguments: string }>;
+};
+
+export type AgentMindSnapshot = {
+  objective: string;
+  compactionSummary: string | null;
+  messages: AgentMindMessage[];
+};
 
 // ---------------------------------------------------------------------------
 // System prompt
@@ -108,6 +123,16 @@ export class PlayerAgent {
 
   stop(): void {
     this.stopped = true;
+  }
+
+  getMindSnapshot(maxMessages = DEFAULT_MIND_HISTORY_LIMIT): AgentMindSnapshot {
+    const fromIndex = Math.max(1, this.messages.length - Math.max(1, maxMessages));
+    const recent = this.messages.slice(fromIndex);
+    return {
+      objective: this.objective,
+      compactionSummary: this.compaction.summary ?? null,
+      messages: recent.map((m) => normalizeMindMessage(m)),
+    };
   }
 
   async start(): Promise<void> {
@@ -235,6 +260,15 @@ export class PlayerAgentManager {
     }));
   }
 
+  getMindSnapshot(
+    sessionHandle: string,
+    maxMessages = DEFAULT_MIND_HISTORY_LIMIT
+  ): AgentMindSnapshot | null {
+    const agent = this.agents.get(sessionHandle);
+    if (!agent) return null;
+    return agent.getMindSnapshot(maxMessages);
+  }
+
   startSyncInterval(): void {
     this.syncTimer = setInterval(
       () => void this.syncSessions(),
@@ -272,4 +306,57 @@ export class PlayerAgentManager {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function normalizeMindMessage(message: Message): AgentMindMessage {
+  const role = typeof message["role"] === "string" ? message["role"] : "unknown";
+  const rawContent = message["content"];
+  const content = normalizeContent(rawContent);
+  const out: AgentMindMessage = { role, content };
+
+  const toolCallId = message["tool_call_id"];
+  if (typeof toolCallId === "string" && toolCallId) {
+    out.toolCallId = toolCallId;
+  }
+  if (typeof message["isError"] === "boolean") {
+    out.isError = message["isError"];
+  }
+
+  const rawToolCalls = message["tool_calls"];
+  if (Array.isArray(rawToolCalls)) {
+    const toolCalls = rawToolCalls
+      .map((raw) => {
+        if (!raw || typeof raw !== "object") return null;
+        const record = raw as Record<string, unknown>;
+        const id = typeof record["id"] === "string" ? record["id"] : "";
+        const fn =
+          typeof record["function"] === "object" && record["function"] !== null
+            ? (record["function"] as Record<string, unknown>)
+            : undefined;
+        const name = typeof fn?.["name"] === "string" ? fn["name"] : "unknown";
+        const args =
+          typeof fn?.["arguments"] === "string"
+            ? fn["arguments"]
+            : safeJsonStringify(fn?.["arguments"] ?? {});
+        return { id: id || `call_${name}`, name, arguments: args };
+      })
+      .filter((v): v is { id: string; name: string; arguments: string } => v !== null);
+    if (toolCalls.length > 0) out.toolCalls = toolCalls;
+  }
+
+  return out;
+}
+
+function normalizeContent(value: unknown): string | null {
+  if (value == null) return null;
+  if (typeof value === "string") return value;
+  return safeJsonStringify(value);
+}
+
+function safeJsonStringify(value: unknown): string {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
 }

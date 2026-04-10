@@ -1,6 +1,7 @@
 import { useEffect, useReducer, useRef, useState } from "react";
 import {
   connectEvents,
+  fetchAgentMind,
   fetchAgentSnapshot,
   fetchAgents,
   pauseAgent,
@@ -14,7 +15,7 @@ import {
 import ChatPane from "./ChatPane.js";
 import InputBar from "./InputBar.js";
 import AgentsPanel, { AgentState } from "./AgentsPanel.js";
-import { AgentFeedItem, TranscriptItem } from "../shared/types.js";
+import { AgentFeedItem, AgentMindSnapshot, TranscriptItem } from "../shared/types.js";
 
 // ---------------------------------------------------------------------------
 // State management
@@ -80,6 +81,75 @@ function syncItems(messages: Record<string, unknown>[]): TranscriptItem[] {
       }
     }
     // skip "tool" messages — shown as part of tool_card above
+  }
+
+  return items;
+}
+
+function syncMindItems(snapshot: AgentMindSnapshot): TranscriptItem[] {
+  const items: TranscriptItem[] = [];
+  const pendingToolCards = new Map<string, number>();
+  const messages = snapshot.messages;
+
+  for (const msg of messages) {
+    if (msg.role === "user" && msg.content) {
+      items.push({ kind: "user", content: msg.content });
+      continue;
+    }
+
+    if (msg.role === "assistant") {
+      if (msg.content) {
+        items.push({ kind: "assistant", content: msg.content });
+      }
+      if (msg.toolCalls) {
+        for (const tc of msg.toolCalls) {
+          const idx = items.length;
+          items.push({
+            kind: "tool_card",
+            toolCallId: tc.id,
+            name: tc.name,
+            status: "running",
+            argsPreview: tc.arguments,
+            resultPreview: null,
+          });
+          pendingToolCards.set(tc.id, idx);
+        }
+      }
+      continue;
+    }
+
+    if (msg.role === "tool" && msg.toolCallId) {
+      const idx = pendingToolCards.get(msg.toolCallId);
+      const result = msg.content ?? "";
+      const status: "ok" | "error" = msg.isError ? "error" : "ok";
+      if (idx !== undefined) {
+        const item = items[idx];
+        if (item?.kind === "tool_card") {
+          items[idx] = { ...item, status, resultPreview: result };
+        }
+      } else {
+        items.push({
+          kind: "tool_card",
+          toolCallId: msg.toolCallId,
+          name: "tool_result",
+          status,
+          argsPreview: "{}",
+          resultPreview: result,
+        });
+      }
+      continue;
+    }
+
+    if (msg.isError && msg.content) {
+      items.push({ kind: "error", message: msg.content });
+    }
+  }
+
+  if (snapshot.compactionSummary?.trim()) {
+    items.unshift({
+      kind: "assistant",
+      content: `Memory summary:\n${snapshot.compactionSummary}`,
+    });
   }
 
   return items;
@@ -213,13 +283,23 @@ export default function App() {
 
   const [agents, setAgents] = useState<AgentState[]>([]);
   const [inputError, setInputError] = useState<string | null>(null);
+  const [activeMindHandle, setActiveMindHandle] = useState<string | null>(null);
+  const [mindItems, setMindItems] = useState<TranscriptItem[]>([]);
+  const [mindLoading, setMindLoading] = useState(false);
+  const [mindError, setMindError] = useState<string | null>(null);
   const pendingUserMsg = useRef<string | null>(null);
   const scriptPollers = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
 
   // Load initial agent list
   useEffect(() => {
     fetchAgents().then((list) =>
-      setAgents(list.map((a) => ({ ...a, feed: [], runningScript: null })))
+      setAgents(
+        list.map((a) => ({
+          ...a,
+          feed: [],
+          runningScript: null,
+        }))
+      )
     ).catch(() => {});
   }, []);
 
@@ -231,6 +311,9 @@ export default function App() {
 
         if (isPlayerEvent) {
           setAgents((prev) => applyAgentEvent(prev, source, event));
+          if (activeMindHandle === source && event.type !== "turn_started") {
+            void loadMindView(source);
+          }
 
           if (event.type === "tool_call_started" && event.name === "run_script") {
             const poll = () => {
@@ -309,7 +392,7 @@ export default function App() {
     );
 
     return disconnect;
-  }, []);
+  }, [activeMindHandle]);
 
   async function handleSubmit(content: string) {
     if (!content.trim() || state.busy) return;
@@ -351,29 +434,84 @@ export default function App() {
     setAgents((prev) => {
       const next = list.map((a) => {
         const existing = prev.find((p) => p.sessionHandle === a.sessionHandle);
-        return existing ? { ...existing, paused: a.paused } : { ...a, feed: [], runningScript: null };
+        return existing
+          ? { ...existing, paused: a.paused }
+          : {
+              ...a,
+              feed: [],
+              runningScript: null,
+            };
       });
       return next;
     });
   }
 
+  async function loadMindView(handle: string) {
+    setMindLoading(true);
+    setMindError(null);
+    const snapshot = await fetchAgentMind(handle, 120);
+    if (!snapshot) {
+      setMindLoading(false);
+      setMindError("failed to load mind snapshot");
+      setMindItems([]);
+      return;
+    }
+    setMindItems(syncMindItems(snapshot));
+    setMindLoading(false);
+    setMindError(null);
+  }
+
+  function exitMindView() {
+    setActiveMindHandle(null);
+    setMindItems([]);
+    setMindError(null);
+    setMindLoading(false);
+  }
+
+  async function handleMindToggle(handle: string) {
+    if (activeMindHandle === handle) {
+      exitMindView();
+      return;
+    }
+
+    setActiveMindHandle(handle);
+    await loadMindView(handle);
+  }
+
   const modelLabel = state.model ? ` [${state.model}]` : "";
+  const showingMind = activeMindHandle !== null;
+  const paneItems = showingMind ? mindItems : state.items;
+  const paneBusy = showingMind ? mindLoading : state.busy;
+  const statusLabel = showingMind
+    ? `Mind view: ${activeMindHandle}`
+    : state.status;
 
   return (
     <div className="app">
       <header className="app-header">
         <span className="app-title">Prayer Chat{modelLabel}</span>
-        <span className="app-status" data-busy={state.busy}>
-          {state.busy ? "⟳ " : ""}{state.status}
+        <span className="app-status" data-busy={paneBusy}>
+          {paneBusy ? "⟳ " : ""}{statusLabel}
         </span>
       </header>
 
       <div className="app-body">
         <div className="app-chat">
-          <ChatPane items={state.items} busy={state.busy} />
+          {showingMind && (
+            <div className="chat-focus-bar">
+              <span className="chat-focus-label">agent mind: {activeMindHandle}</span>
+              <button className="agent-btn agent-btn--mind-open" onClick={exitMindView}>
+                return to chat
+              </button>
+            </div>
+          )}
+          {showingMind && mindError && (
+            <div className="input-error">{mindError}</div>
+          )}
+          <ChatPane items={paneItems} busy={paneBusy} />
           <InputBar
             onSubmit={handleSubmit}
-            disabled={state.busy}
+            disabled={showingMind || state.busy}
             error={inputError}
           />
         </div>
@@ -382,6 +520,8 @@ export default function App() {
           onPause={handlePause}
           onResume={handleResume}
           onObjective={handleObjective}
+          onMindToggle={handleMindToggle}
+          activeMindHandle={activeMindHandle}
           onSync={handleSync}
         />
       </div>

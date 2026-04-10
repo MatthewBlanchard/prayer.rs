@@ -1,4 +1,4 @@
-import { AgentInfo, ToolLoopEvent } from "../shared/types.js";
+import { AgentInfo, AgentMindSnapshot, ToolLoopEvent } from "../shared/types.js";
 
 export type StateSyncEvent = {
   type: "state_sync";
@@ -109,6 +109,19 @@ export async function fetchAgentSnapshot(handle: string): Promise<AgentSnapshot 
       currentScriptLine: (snap["currentScriptLine"] as number | null) ?? null,
       isHalted: (snap["isHalted"] as boolean) ?? false,
     };
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchAgentMind(handle: string, limit = 60): Promise<AgentMindSnapshot | null> {
+  try {
+    const res = await fetch(
+      `/api/agents/${encodeURIComponent(handle)}/mind?limit=${encodeURIComponent(String(limit))}`
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as { snapshot?: AgentMindSnapshot };
+    return data["snapshot"] ?? null;
   } catch {
     return null;
   }

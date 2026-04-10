@@ -87,7 +87,7 @@ function parseArgs(): {
   const prayerApiUrl = get(
     "--prayer-api-url",
     "PRAYER_MCP_CLIENT_API_URL",
-    "http://127.0.0.1:3000"
+    "http://127.0.0.1:7777"
   );
 
   return {
@@ -396,6 +396,19 @@ async function main(): Promise<void> {
       return;
     }
     res.json(snapshot);
+  });
+
+  app.get("/api/agents/:handle/mind", (req: Request, res: Response) => {
+    const handle = req.params["handle"] ?? "";
+    const limitRaw = req.query["limit"];
+    const parsed = typeof limitRaw === "string" ? parseInt(limitRaw, 10) : NaN;
+    const limit = Number.isFinite(parsed) ? Math.max(1, Math.min(200, parsed)) : 60;
+    const snapshot = playerManager.getMindSnapshot(handle, limit);
+    if (!snapshot) {
+      res.status(404).json({ error: `no agent running for "${handle}"` });
+      return;
+    }
+    res.json({ snapshot });
   });
 
   app.post("/api/agents/:handle/pause", (req: Request, res: Response) => {

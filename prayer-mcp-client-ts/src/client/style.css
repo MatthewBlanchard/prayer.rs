@@ -36,8 +36,7 @@ html, body, #root {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;
 }
 
 .app-header {
@@ -347,6 +346,21 @@ html, body, #root {
   overflow: hidden;
 }
 
+.chat-focus-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+
+.chat-focus-label {
+  color: var(--orange);
+  font-size: 12px;
+}
+
 /* Agents panel */
 .agents-panel {
   width: 280px;
@@ -418,18 +432,6 @@ html, body, #root {
   white-space: nowrap;
 }
 
-.agent-badge {
-  font-size: 10px;
-  padding: 1px 5px;
-  border-radius: 3px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  flex-shrink: 0;
-}
-
-.agent-badge--running { background: var(--blue);       color: var(--bg); }
-.agent-badge--paused  { background: var(--text-faint); color: var(--bg); }
-
 .agent-controls {
   display: flex;
   gap: 4px;
@@ -454,6 +456,8 @@ html, body, #root {
 .agent-btn--resume:hover  { color: var(--green);  border-color: var(--green); }
 .agent-btn--sync:hover    { color: var(--cyan);   border-color: var(--cyan); }
 .agent-btn--obj:hover     { color: var(--magenta);border-color: var(--magenta); }
+.agent-btn--mind:hover    { color: var(--orange); border-color: var(--orange); }
+.agent-btn--mind-open     { color: var(--orange); border-color: var(--orange); }
 
 .agent-objective-row {
   display: flex;
