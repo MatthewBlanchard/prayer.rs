@@ -275,7 +275,7 @@ impl PrayerMcpServer {
 
     #[tool(
         description = "Load a PrayerLang script into a session (selected by session_handle) and execute it. \
-        Returns the normalized script plus execution result (steps_executed, halted, completed, error)."
+        Returns session, normalized script, status (completed/halted/step limit reached/error), and steps executed."
     )]
     async fn run_script(
         &self,
@@ -286,8 +286,7 @@ impl PrayerMcpServer {
         }): Parameters<RunScriptInput>,
     ) -> Result<String, String> {
         let session_id = self.resolve_session_id_or_error(&session_handle).await?;
-        let load_result = self
-            .client
+        self.client
             .load_script(&session_id, &script)
             .await
             .map_err(|e| {
@@ -314,13 +313,21 @@ impl PrayerMcpServer {
                 msg
             })?;
 
-        let load = strip_session_id_fields(&load_result);
-        let execute = strip_session_id_fields(&exec_result);
+        let status = if exec_result["error"].is_string() {
+            format!("error: {}", exec_result["error"].as_str().unwrap_or("unknown"))
+        } else if exec_result["completed"].as_bool().unwrap_or(false) {
+            "completed".to_string()
+        } else if exec_result["halted"].as_bool().unwrap_or(false) {
+            "halted".to_string()
+        } else {
+            "step limit reached".to_string()
+        };
+        let steps = exec_result["steps_executed"].as_u64().unwrap_or(0);
         let payload = serde_json::json!({
-            "session_handle": session_handle,
-            "script_pretty": pretty_script,
-            "load": load,
-            "execute": execute,
+            "session": session_handle,
+            "script": pretty_script.trim(),
+            "status": status,
+            "steps": steps,
         });
 
         Ok(serde_json::to_string_pretty(&payload).unwrap_or_default())
