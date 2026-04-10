@@ -12,6 +12,7 @@ import {
   ToolLoopEvent,
 } from "./tool_loop.js";
 import { ConvoLogger } from "./logger.js";
+import { PlayerAgentManager } from "./player_agent.js";
 
 // ---------------------------------------------------------------------------
 // CLI args
@@ -139,8 +140,8 @@ function buildSystemPrompt(
 
 const sseClients = new Set<Response>();
 
-function broadcast(event: ToolLoopEvent): void {
-  const data = `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`;
+function broadcast(event: ToolLoopEvent, source = "commander"): void {
+  const data = `event: ${event.type}\ndata: ${JSON.stringify({ ...event, source })}\n\n`;
   for (const client of sseClients) {
     try {
       client.write(data);
@@ -180,6 +181,17 @@ async function main(): Promise<void> {
   const loop = new ChatToolLoop(llmProvider, mcp, model, loopConfig);
   await loop.connect();
   console.log(`LLM provider: ${provider}, model: ${model}`);
+
+  const playerManager = new PlayerAgentManager(
+    llmProvider,
+    mcp,
+    model,
+    loop.getBootstrapReference(),
+    (sessionHandle, event) => broadcast(event, sessionHandle)
+  );
+  await playerManager.syncSessions();
+  playerManager.startSyncInterval();
+  console.log("Player agent manager started.");
 
   const systemPrompt = buildSystemPrompt(
     loop.getBootstrapReference(),
@@ -321,6 +333,51 @@ async function main(): Promise<void> {
     }
   });
 
+  // Player agent endpoints
+  app.get("/api/agents", (_req: Request, res: Response) => {
+    res.json(playerManager.listAgents());
+  });
+
+  app.post("/api/agents/sync", async (_req: Request, res: Response) => {
+    await playerManager.syncSessions();
+    res.json(playerManager.listAgents());
+  });
+
+  app.post("/api/agents/:handle/pause", (req: Request, res: Response) => {
+    const handle = req.params["handle"] ?? "";
+    const ok = playerManager.pauseAgent(handle);
+    if (!ok) {
+      res.status(404).json({ error: `no agent running for "${handle}"` });
+      return;
+    }
+    res.json({ ok: true, paused: true });
+  });
+
+  app.post("/api/agents/:handle/resume", (req: Request, res: Response) => {
+    const handle = req.params["handle"] ?? "";
+    const ok = playerManager.resumeAgent(handle);
+    if (!ok) {
+      res.status(404).json({ error: `no agent running for "${handle}"` });
+      return;
+    }
+    res.json({ ok: true, paused: false });
+  });
+
+  app.post("/api/agents/:handle/objective", (req: Request, res: Response) => {
+    const handle = req.params["handle"] ?? "";
+    const objective = ((req.body as { objective?: string }).objective ?? "").trim();
+    if (!objective) {
+      res.status(400).json({ error: "objective is required" });
+      return;
+    }
+    const ok = playerManager.setObjective(handle, objective);
+    if (!ok) {
+      res.status(404).json({ error: `no agent running for "${handle}"` });
+      return;
+    }
+    res.json({ ok: true });
+  });
+
   // Health check
   app.get("/api/health", (_req: Request, res: Response) => {
     res.json({ ok: true, model, provider, busy });
@@ -334,6 +391,7 @@ async function main(): Promise<void> {
   process.on("SIGINT", async () => {
     console.log("\nShutting down...");
     logger.close();
+    await playerManager.stopAll();
     await mcp.close();
     process.exit(0);
   });
