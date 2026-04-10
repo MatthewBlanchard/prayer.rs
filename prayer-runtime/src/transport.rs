@@ -4,13 +4,12 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use crate::engine::{
-    CatalogEntryData, CommandArg, EngineCommand, EngineError, EngineExecutionResult, GalaxyData,
+    CatalogEntryData, CommandArg, EngineCommand, EngineExecutionResult, GalaxyData,
     GameState, MarketData, MarketOrderInfo, MissionData, MissionInfoData, OpenOrderInfo,
     ShipState,
 };
 use async_trait::async_trait;
 use reqwest::StatusCode;
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use thiserror::Error;
 
