@@ -879,7 +879,6 @@ mod tests {
                     rewards_summary: "{\"credits\":500}".to_string(),
                     ..prayer_runtime::engine::MissionInfoData::default()
                 }],
-                ..prayer_runtime::engine::MissionData::default()
             }),
             system: Some("sol".to_string()),
             ..GameState::default()

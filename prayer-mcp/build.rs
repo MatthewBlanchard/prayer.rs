@@ -4,7 +4,7 @@
 //! `COMMAND_DOCS`, then generates two files into `OUT_DIR`:
 //!
 //! - `dsl_reference.txt`  — full PrayerLang reference (static header + generated
-//!                           commands section + static footer)
+//!   commands section + static footer)
 //! - `dsl_commands.json`  — commands array used by `dsl_reference_json()`
 
 use prayer_runtime::catalog::{default_command_catalog, COMMAND_DOCS};
@@ -47,7 +47,9 @@ fn main() {
         std::process::exit(1);
     }
 
-    let out_dir: PathBuf = std::env::var("OUT_DIR").unwrap().into();
+    let out_dir: PathBuf = std::env::var("OUT_DIR")
+        .expect("OUT_DIR must be set by Cargo during build script execution")
+        .into();
 
     // Generate the commands section and JSON using COMMAND_DOCS order.
     let mut md_commands = String::from("## Default command catalog\n\nCurrent built-in commands:\n");
