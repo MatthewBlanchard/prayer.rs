@@ -119,6 +119,7 @@ function buildSystemPrompt(
     "If the user asks for an 'overview', interpret it as a sessions/bots overview unless they specify another target.",
     "If the user asks a direct question instead of requesting a script, answer briefly and accurately.",
     "When invoking session-scoped MCP tools, pass session_handle (from list_sessions playerName), never session IDs.",
+    "At the start of a new turn, call fs_ls on / to get your bearings before planning actions.",
     "For world-state questions, inspect MCP VFS first (fs_read/fs_query) before answering.",
     "For travel options, read /status.json for current system, then check /systems/{system_id}.json.",
     "For nearby POIs or stations in the current system, read /systems/{system_id}.json.",
@@ -348,7 +349,7 @@ async function main(): Promise<void> {
   });
 
   // Clear conversation
-  app.post("/api/reset", (_req: Request, res: Response) => {
+  app.post("/api/reset", async (_req: Request, res: Response) => {
     if (busy) {
       res.status(409).json({ error: "busy" });
       return;
@@ -439,6 +440,16 @@ async function main(): Promise<void> {
       return;
     }
     const ok = playerManager.setObjective(handle, objective);
+    if (!ok) {
+      res.status(404).json({ error: `no agent running for "${handle}"` });
+      return;
+    }
+    res.json({ ok: true });
+  });
+
+  app.post("/api/agents/:handle/clear-context", async (req: Request, res: Response) => {
+    const handle = req.params["handle"] ?? "";
+    const ok = await playerManager.clearContext(handle);
     if (!ok) {
       res.status(404).json({ error: `no agent running for "${handle}"` });
       return;

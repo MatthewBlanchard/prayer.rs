@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import ReactMarkdown from "react-markdown";
 import { TranscriptItem } from "../shared/types.js";
 
 const PRAYER_FLOW_KEYWORDS = new Set(["if", "until"]);
@@ -89,58 +90,48 @@ function ThinkingBlock({ content }: { content: string }) {
   );
 }
 
+function CodeBlock({ lang, codeText }: { lang: string; codeText: string }) {
+  const isPrayer = lang === "prayer" || lang === "prayerlang";
+  const lines = codeText.split("\n");
+  // Strip trailing empty line that markdown parsers often add
+  if (lines[lines.length - 1] === "") lines.pop();
+  return (
+    <div className="code-block">
+      <div className="code-block-header">{lang || "code"}</div>
+      <pre className={isPrayer ? "code-prayer" : "code-generic"}>
+        {lines.map((cl, i) => (
+          <div key={i} className="code-line">
+            {isPrayer ? <PrayerLine line={cl} /> : cl}
+          </div>
+        ))}
+      </pre>
+    </div>
+  );
+}
+
+const mdComponents: React.ComponentProps<typeof ReactMarkdown>["components"] = {
+  // Fenced code blocks
+  pre({ children }) {
+    // ReactMarkdown wraps code in <pre><code className="language-xxx">
+    // We intercept at the <pre> level to grab both lang and text
+    const codeEl = (children as React.ReactElement[] | undefined)?.[0];
+    const className: string = (codeEl?.props as Record<string, unknown>)?.["className"] as string ?? "";
+    const lang = className.replace("language-", "").toLowerCase();
+    const codeText = String((codeEl?.props as Record<string, unknown>)?.["children"] ?? "");
+    return <CodeBlock lang={lang} codeText={codeText} />;
+  },
+  // Inline code
+  code({ children }) {
+    return <code className="inline-code">{children}</code>;
+  },
+  // Wrap paragraphs in assistant-line style
+  p({ children }) {
+    return <div className="assistant-line">{children}</div>;
+  },
+};
+
 function TextContent({ content }: { content: string }) {
-  const lines = content.split("\n");
-  const elements: React.ReactNode[] = [];
-  let inCode = false;
-  let codeLang = "";
-  let codeLines: string[] = [];
-
-  const flushCode = (key: string) => {
-    const isPrayer = codeLang === "prayer" || codeLang === "prayerlang";
-    elements.push(
-      <div key={key} className="code-block">
-        <div className="code-block-header">{codeLang || "code"}</div>
-        <pre className={isPrayer ? "code-prayer" : "code-generic"}>
-          {codeLines.map((cl, i) => (
-            <div key={i} className="code-line">
-              {isPrayer ? <PrayerLine line={cl} /> : cl}
-            </div>
-          ))}
-        </pre>
-      </div>
-    );
-    codeLines = [];
-    codeLang = "";
-  };
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (line.trimStart().startsWith("```")) {
-      if (inCode) {
-        flushCode(`code-${i}`);
-        inCode = false;
-      } else {
-        codeLang = line.trimStart().slice(3).trim().toLowerCase();
-        inCode = true;
-      }
-      continue;
-    }
-
-    if (inCode) {
-      codeLines.push(line);
-    } else {
-      elements.push(
-        <div key={i} className="assistant-line">
-          {line || "\u00a0"}
-        </div>
-      );
-    }
-  }
-
-  if (inCode && codeLines.length > 0) flushCode("code-trailing");
-
-  return <>{elements}</>;
+  return <ReactMarkdown components={mdComponents}>{content}</ReactMarkdown>;
 }
 
 function AssistantContent({ content }: { content: string }) {

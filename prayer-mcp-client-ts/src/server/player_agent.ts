@@ -40,6 +40,7 @@ function buildPlayerSystemPrompt(
   let prompt = [
     `You are an autonomous agent managing SpaceMolt player "${sessionHandle}".`,
     "Your tools are pre-scoped to your session — do not include session_handle in any tool arguments.",
+    "At the start of a new turn, call fs_ls on / to get your bearings before choosing actions.",
     "Operate continuously: mine resources, fulfill missions, manage cargo and fuel as needed.",
     "When running a script, pass only raw PrayerLang script text — no markdown fences, no prose.",
     "Use fs_read/fs_query to inspect state before acting.",
@@ -64,11 +65,13 @@ function buildPlayerSystemPrompt(
 
 export class PlayerAgent {
   private readonly loop: ChatToolLoop;
+  private readonly sessionMcp: IMcpClient;
   private readonly messages: Message[];
   private readonly compaction: CompactionState;
   private stopped = false;
   private pauseGate: Promise<void> | undefined;
   private resolvePause: (() => void) | undefined;
+  private haltInFlight = false;
   private objective = "";
 
   constructor(
@@ -76,10 +79,11 @@ export class PlayerAgent {
     provider: CompletionProvider,
     sharedMcp: IMcpClient,
     model: string,
-    dslReference: string | undefined,
+    private readonly dslReference: string | undefined,
     private readonly onEvent: (sessionHandle: string, event: ToolLoopEvent) => void
   ) {
     const proxy = new SessionScopedMcpProxy(sharedMcp, sessionHandle);
+    this.sessionMcp = proxy;
     this.loop = new ChatToolLoop(provider, proxy, model, {
       ...defaultLoopConfig,
       includeSyntheticReadResource: true,
@@ -91,7 +95,8 @@ export class PlayerAgent {
       },
     ];
     this.compaction = newCompactionState();
-    // Start paused — waits for an objective before calling the LLM
+
+    // New agents start paused by default.
     this.pause();
   }
 
@@ -109,6 +114,7 @@ export class PlayerAgent {
     this.pauseGate = new Promise((resolve) => {
       this.resolvePause = resolve;
     });
+    void this.haltSessionNow();
   }
 
   resume(): void {
@@ -123,6 +129,16 @@ export class PlayerAgent {
 
   stop(): void {
     this.stopped = true;
+  }
+
+  async clearContext(): Promise<void> {
+    this.pause();
+    this.messages.length = 0;
+    this.messages.push({
+      role: "system",
+      content: buildPlayerSystemPrompt(this.sessionHandle, this.dslReference, this.objective),
+    });
+    this.compaction.summary = undefined;
   }
 
   getMindSnapshot(maxMessages = DEFAULT_MIND_HISTORY_LIMIT): AgentMindSnapshot {
@@ -172,6 +188,22 @@ export class PlayerAgent {
       if (toolCallCount === 0 && !this.stopped && !this.pauseGate) {
         await sleep(IDLE_SLEEP_MS);
       }
+    }
+  }
+
+  private async haltSessionNow(): Promise<void> {
+    if (this.haltInFlight) return;
+    this.haltInFlight = true;
+    try {
+      await this.sessionMcp.callTool("halt_session", {
+        reason: "paused by agent control",
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`[player-agent:${this.sessionHandle}] halt_session failed: ${message}`);
+      this.onEvent(this.sessionHandle, { type: "error", message: `halt_session failed: ${message}` });
+    } finally {
+      this.haltInFlight = false;
     }
   }
 }
@@ -258,6 +290,13 @@ export class PlayerAgentManager {
       sessionHandle,
       paused: agent.isPaused(),
     }));
+  }
+
+  async clearContext(sessionHandle: string): Promise<boolean> {
+    const agent = this.agents.get(sessionHandle);
+    if (!agent) return false;
+    await agent.clearContext();
+    return true;
   }
 
   getMindSnapshot(

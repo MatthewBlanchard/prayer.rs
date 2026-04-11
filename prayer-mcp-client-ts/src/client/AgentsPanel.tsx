@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AgentFeedItem, AgentInfo } from "../shared/types.js";
+import { AgentInfo } from "../shared/types.js";
 
 export type RunningScript = {
   script: string;
@@ -7,8 +7,8 @@ export type RunningScript = {
 };
 
 export type AgentState = AgentInfo & {
-  feed: AgentFeedItem[];
   runningScript: RunningScript | null;
+  currentSystem: string | null;
 };
 
 function ScriptViewer({ script, currentLine }: { script: string; currentLine: number | null }) {
@@ -32,13 +32,15 @@ interface AgentCardProps {
   agent: AgentState;
   onTogglePaused: () => void;
   onObjective: (objective: string) => void;
+  onClearContext: () => void;
   onMindToggle: () => void;
   mindActive: boolean;
 }
 
-function AgentCard({ agent, onTogglePaused, onObjective, onMindToggle, mindActive }: AgentCardProps) {
+function AgentCard({ agent, onTogglePaused, onObjective, onClearContext, onMindToggle, mindActive }: AgentCardProps) {
   const [objectiveInput, setObjectiveInput] = useState("");
   const [showObjective, setShowObjective] = useState(false);
+  const visuallyPaused = agent.paused && !agent.runningScript;
 
   function handleObjectiveSubmit() {
     const trimmed = objectiveInput.trim();
@@ -49,23 +51,33 @@ function AgentCard({ agent, onTogglePaused, onObjective, onMindToggle, mindActiv
   }
 
   return (
-    <div className={`agent-card ${agent.paused ? "agent-card--paused" : "agent-card--running"}`}>
+    <div className={`agent-card ${visuallyPaused ? "agent-card--paused" : "agent-card--running"}`}>
       <div className="agent-card-header">
         <span className="agent-handle">{agent.sessionHandle}</span>
         <div className="agent-controls">
           <button
-            className={`agent-btn ${agent.paused ? "agent-btn--resume" : "agent-btn--pause"}`}
+            className={`agent-btn ${visuallyPaused ? "agent-btn--resume" : "agent-btn--pause"}`}
             onClick={onTogglePaused}
-            title={agent.paused ? "Resume agent" : "Pause agent"}
-            aria-label={agent.paused ? "Resume agent" : "Pause agent"}
+            title={visuallyPaused ? "Resume agent" : "Pause agent"}
+            aria-label={visuallyPaused ? "Resume agent" : "Pause agent"}
           >
-            {agent.paused ? "▶️" : "⏸️"}
+            {visuallyPaused ? "▶️" : "⏸️"}
           </button>
           <button
             className="agent-btn agent-btn--obj"
             onClick={() => setShowObjective((v) => !v)}
+            title="Set objective"
+            aria-label="Set objective"
           >
-            objective
+            💬
+          </button>
+          <button
+            className="agent-btn agent-btn--clear"
+            onClick={onClearContext}
+            title="Clear agent context"
+            aria-label="Clear agent context"
+          >
+            ♻️
           </button>
           <button
             className={`agent-btn agent-btn--mind${mindActive ? " agent-btn--mind-open" : ""}`}
@@ -76,6 +88,11 @@ function AgentCard({ agent, onTogglePaused, onObjective, onMindToggle, mindActiv
             👁️
           </button>
         </div>
+      </div>
+
+      <div className="agent-system-row">
+        <span className="agent-system-label">system</span>
+        <span className="agent-system-value">{agent.currentSystem ?? "unknown"}</span>
       </div>
 
       {showObjective && (
@@ -95,23 +112,8 @@ function AgentCard({ agent, onTogglePaused, onObjective, onMindToggle, mindActiv
       {agent.runningScript ? (
         <ScriptViewer script={agent.runningScript.script} currentLine={agent.runningScript.currentLine} />
       ) : (
-        <div className="agent-feed">
-          {agent.feed.length === 0 && (
-            <div className="agent-feed-empty">no activity yet</div>
-          )}
-          {agent.feed.map((item, i) => {
-            if (item.kind === "error") {
-              return (
-                <div key={i} className="agent-feed-error">{item.message}</div>
-              );
-            }
-            return (
-              <div key={i} className={`agent-feed-tool agent-feed-tool--${item.status}`}>
-                <span className="agent-feed-tool-status">[{item.status}]</span>
-                <span className="agent-feed-tool-name">{item.name}</span>
-              </div>
-            );
-          })}
+        <div className="agent-feed agent-feed--idle">
+          <div className="agent-feed-empty">idle</div>
         </div>
       )}
 
@@ -124,6 +126,7 @@ interface AgentsPanelProps {
   onPause: (handle: string) => void;
   onResume: (handle: string) => void;
   onObjective: (handle: string, objective: string) => void;
+  onClearContext: (handle: string) => void;
   onMindToggle: (handle: string) => void;
   activeMindHandle: string | null;
   onSync: () => void;
@@ -134,6 +137,7 @@ export default function AgentsPanel({
   onPause,
   onResume,
   onObjective,
+  onClearContext,
   onMindToggle,
   activeMindHandle,
   onSync,
@@ -148,16 +152,20 @@ export default function AgentsPanel({
         {agents.length === 0 && (
           <div className="agents-empty">no active agents</div>
         )}
-        {agents.map((agent) => (
-          <AgentCard
-            key={agent.sessionHandle}
-            agent={agent}
-            onTogglePaused={() => (agent.paused ? onResume(agent.sessionHandle) : onPause(agent.sessionHandle))}
-            onObjective={(obj) => onObjective(agent.sessionHandle, obj)}
-            onMindToggle={() => onMindToggle(agent.sessionHandle)}
-            mindActive={activeMindHandle === agent.sessionHandle}
-          />
-        ))}
+        {agents.map((agent) => {
+          const visuallyPaused = agent.paused && !agent.runningScript;
+          return (
+            <AgentCard
+              key={agent.sessionHandle}
+              agent={agent}
+              onTogglePaused={() => (visuallyPaused ? onResume(agent.sessionHandle) : onPause(agent.sessionHandle))}
+              onObjective={(obj) => onObjective(agent.sessionHandle, obj)}
+              onClearContext={() => onClearContext(agent.sessionHandle)}
+              onMindToggle={() => onMindToggle(agent.sessionHandle)}
+              mindActive={activeMindHandle === agent.sessionHandle}
+            />
+          );
+        })}
       </div>
     </div>
   );

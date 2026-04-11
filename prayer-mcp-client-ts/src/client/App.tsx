@@ -1,5 +1,6 @@
 import { useEffect, useReducer, useRef, useState } from "react";
 import {
+  clearAgentContext,
   connectEvents,
   fetchAgentMind,
   fetchAgentSnapshot,
@@ -15,7 +16,7 @@ import {
 import ChatPane from "./ChatPane.js";
 import InputBar from "./InputBar.js";
 import AgentsPanel, { AgentState } from "./AgentsPanel.js";
-import { AgentFeedItem, AgentMindSnapshot, TranscriptItem } from "../shared/types.js";
+import { AgentMindSnapshot, TranscriptItem } from "../shared/types.js";
 
 // ---------------------------------------------------------------------------
 // State management
@@ -235,41 +236,6 @@ function reducer(state: AppState, action: Action): AppState {
 }
 
 // ---------------------------------------------------------------------------
-// Agent state helpers
-// ---------------------------------------------------------------------------
-
-const MAX_FEED_ITEMS = 30;
-
-function applyAgentEvent(agents: AgentState[], source: string, event: ServerEvent): AgentState[] {
-  return agents.map((a) => {
-    if (a.sessionHandle !== source) return a;
-
-    let feed = [...a.feed];
-
-    if (event.type === "tool_call_started") {
-      const item: AgentFeedItem = {
-        kind: "tool_call",
-        toolCallId: event.toolCallId,
-        name: event.name,
-        status: "running",
-        resultPreview: null,
-      };
-      feed = [...feed, item].slice(-MAX_FEED_ITEMS);
-    } else if (event.type === "tool_call_completed") {
-      feed = feed.map((f) =>
-        f.kind === "tool_call" && f.toolCallId === event.toolCallId
-          ? { ...f, status: event.outcome, resultPreview: event.resultPreview }
-          : f
-      );
-    } else if (event.type === "error") {
-      feed = [...feed, { kind: "error" as const, message: event.message }].slice(-MAX_FEED_ITEMS);
-    }
-
-    return { ...a, feed };
-  });
-}
-
-// ---------------------------------------------------------------------------
 // App
 // ---------------------------------------------------------------------------
 
@@ -290,18 +256,63 @@ export default function App() {
   const pendingUserMsg = useRef<string | null>(null);
   const scriptPollers = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
 
+  async function refreshAgentsFromServer() {
+    const list = await syncAgents();
+    setAgents((prev) => {
+      const next = list.map((a) => {
+        const existing = prev.find((p) => p.sessionHandle === a.sessionHandle);
+        return existing
+          ? { ...existing, paused: a.paused }
+          : {
+              ...a,
+              runningScript: null,
+              currentSystem: null,
+            };
+      });
+      return next;
+    });
+  }
+
   // Load initial agent list
   useEffect(() => {
     fetchAgents().then((list) =>
       setAgents(
         list.map((a) => ({
           ...a,
-          feed: [],
           runningScript: null,
+          currentSystem: null,
         }))
       )
     ).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (agents.length === 0) return;
+    const handles = agents.map((a) => a.sessionHandle);
+    const poll = () => {
+      handles.forEach((handle) => {
+        fetchAgentSnapshot(handle).then((snap) => {
+          if (!snap) return;
+          setAgents((prev) =>
+            prev.map((a) =>
+              a.sessionHandle !== handle
+                ? a
+                : {
+                    ...a,
+                    currentSystem: snap.latestSystem ?? a.currentSystem,
+                    runningScript: snap.currentScript && !snap.isHalted
+                      ? { script: snap.currentScript, currentLine: snap.currentScriptLine }
+                      : null,
+                  }
+            )
+          );
+        }).catch(() => {});
+      });
+    };
+    poll();
+    const timer = setInterval(poll, 10_000);
+    return () => clearInterval(timer);
+  }, [agents.map((a) => a.sessionHandle).join("|")]);
 
   useEffect(() => {
     const disconnect = connectEvents(
@@ -310,7 +321,18 @@ export default function App() {
         const isPlayerEvent = source && source !== "commander";
 
         if (isPlayerEvent) {
-          setAgents((prev) => applyAgentEvent(prev, source, event));
+          fetchAgentSnapshot(source).then((snap) => {
+            if (!snap) return;
+            setAgents((prev) => prev.map((a) =>
+              a.sessionHandle !== source ? a : {
+                ...a,
+                currentSystem: snap.latestSystem ?? a.currentSystem,
+                runningScript: snap.currentScript && !snap.isHalted
+                  ? { script: snap.currentScript, currentLine: snap.currentScriptLine }
+                  : null,
+              }
+            ));
+          }).catch(() => {});
           if (activeMindHandle === source && event.type !== "turn_started") {
             void loadMindView(source);
           }
@@ -370,6 +392,14 @@ export default function App() {
             });
             break;
           case "tool_call_completed":
+            if (
+              event.name === "create_session" ||
+              event.name === "register_session" ||
+              event.name === "remove_session" ||
+              event.name === "list_sessions"
+            ) {
+              void refreshAgentsFromServer();
+            }
             dispatch({
               type: "tool_call_completed",
               toolCallId: event.toolCallId,
@@ -429,21 +459,15 @@ export default function App() {
     await setAgentObjective(handle, objective);
   }
 
+  async function handleClearContext(handle: string) {
+    await clearAgentContext(handle);
+    setAgents((prev) =>
+      prev.map((a) => (a.sessionHandle === handle ? { ...a, runningScript: null, paused: true } : a))
+    );
+  }
+
   async function handleSync() {
-    const list = await syncAgents();
-    setAgents((prev) => {
-      const next = list.map((a) => {
-        const existing = prev.find((p) => p.sessionHandle === a.sessionHandle);
-        return existing
-          ? { ...existing, paused: a.paused }
-          : {
-              ...a,
-              feed: [],
-              runningScript: null,
-            };
-      });
-      return next;
-    });
+    await refreshAgentsFromServer();
   }
 
   async function loadMindView(handle: string) {
@@ -520,6 +544,7 @@ export default function App() {
           onPause={handlePause}
           onResume={handleResume}
           onObjective={handleObjective}
+          onClearContext={handleClearContext}
           onMindToggle={handleMindToggle}
           activeMindHandle={activeMindHandle}
           onSync={handleSync}

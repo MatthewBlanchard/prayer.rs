@@ -98,6 +98,39 @@ html, body, #root {
 
 .assistant-line {
   line-height: 1.6;
+  margin: 2px 0;
+}
+
+/* Markdown elements inside assistant messages */
+.message-content h1,
+.message-content h2,
+.message-content h3,
+.message-content h4 {
+  margin: 8px 0 4px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.message-content h1 { font-size: 1.25em; }
+.message-content h2 { font-size: 1.1em; }
+.message-content h3 { font-size: 1em; }
+
+.message-content ul,
+.message-content ol {
+  margin: 4px 0;
+  padding-left: 1.4em;
+}
+.message-content li {
+  line-height: 1.6;
+}
+
+.message-content strong { font-weight: 600; }
+.message-content em { font-style: italic; }
+
+.message-content blockquote {
+  border-left: 3px solid var(--border);
+  margin: 4px 0;
+  padding-left: 10px;
+  color: var(--text-dim);
 }
 
 /* Code blocks */
@@ -128,6 +161,15 @@ html, body, #root {
 
 .code-line {
   line-height: 1.6;
+}
+
+.inline-code {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-family: inherit;
+  font-size: 0.9em;
 }
 
 /* Prayer syntax highlighting */
@@ -479,6 +521,30 @@ html, body, #root {
 
 .agent-objective-input::placeholder { color: var(--text-faint); }
 
+.agent-system-row {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.agent-system-label {
+  color: var(--text-faint);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.agent-system-value {
+  color: var(--cyan);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Agent feed */
 .agent-feed {
   padding: 4px 8px;
@@ -487,6 +553,11 @@ html, body, #root {
   gap: 2px;
   max-height: 160px;
   overflow-y: auto;
+}
+
+.agent-feed--idle {
+  max-height: none;
+  overflow: hidden;
 }
 
 .agent-feed-empty {

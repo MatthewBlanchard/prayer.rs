@@ -95,6 +95,7 @@ export type AgentSnapshot = {
   currentScript: string | null;
   currentScriptLine: number | null;
   isHalted: boolean;
+  latestSystem: string | null;
 };
 
 export async function fetchAgentSnapshot(handle: string): Promise<AgentSnapshot | null> {
@@ -108,10 +109,15 @@ export async function fetchAgentSnapshot(handle: string): Promise<AgentSnapshot 
       currentScript: (snap["currentScript"] as string | null) ?? null,
       currentScriptLine: (snap["currentScriptLine"] as number | null) ?? null,
       isHalted: (snap["isHalted"] as boolean) ?? false,
+      latestSystem: (data["latestSystem"] as string | null) ?? null,
     };
   } catch {
     return null;
   }
+}
+
+export async function clearAgentContext(handle: string): Promise<void> {
+  await fetch(`/api/agents/${encodeURIComponent(handle)}/clear-context`, { method: "POST" });
 }
 
 export async function fetchAgentMind(handle: string, limit = 60): Promise<AgentMindSnapshot | null> {
