@@ -1,0 +1,39 @@
+## Skill library syntax
+
+Skill libraries support:
+
+- `skill`
+- `override ... when ...`
+- `@disable`
+
+Keywords are case-sensitive (`skill`, `override`, `when`, `@disable`).
+
+Example:
+
+```prayer
+@disable mine;
+
+skill travel(system: system_id) {
+  go $system;
+}
+
+override safety when FUEL() <= 5 {
+  halt;
+}
+```
+
+Notes:
+
+- `@disable` accepts optional trailing `;`
+- Skill parameter types:
+  - `any`
+  - `integer`
+  - `item_id`
+  - `system_id`
+  - `poi_id`
+  - `go_target`
+  - `ship_id`
+  - `listing_id`
+  - `mission_id`
+  - `module_id`
+  - `recipe_id`

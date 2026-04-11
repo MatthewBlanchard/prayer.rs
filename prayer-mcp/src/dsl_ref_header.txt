@@ -13,11 +13,10 @@ Scripts are statement-based.
 Example:
 
 ```prayer
-// mine until cargo is full, then halt
-until CARGO_PCT() >= 100 {
-  mine;
+until MINED(iron_ore) >= 50 {
+  mine iron_ore;
+  stash;
 }
-halt;
 ```
 
 ## Control flow
@@ -86,42 +85,6 @@ Macros are resolved by analyzer/engine:
 
 Skill parameters are referenced as `$param_name`.
 
-## Skill library syntax
+## Skill libraries and overrides
 
-Skill libraries support:
-
-- `skill`
-- `override ... when ...`
-- `@disable`
-
-Keywords are case-sensitive (`skill`, `override`, `when`, `@disable`).
-
-Example:
-
-```prayer
-@disable mine;
-
-skill travel(system: system_id) {
-  go $system;
-}
-
-override safety when FUEL() <= 5 {
-  halt;
-}
-```
-
-Notes:
-
-- `@disable` accepts optional trailing `;`
-- Skill parameter types:
-  - `any`
-  - `integer`
-  - `item_id`
-  - `system_id`
-  - `poi_id`
-  - `go_target`
-  - `ship_id`
-  - `listing_id`
-  - `mission_id`
-  - `module_id`
-  - `recipe_id`
+See `prayer://dsl/overrides` for skill-library and override syntax/details.

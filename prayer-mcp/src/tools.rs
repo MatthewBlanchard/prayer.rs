@@ -323,12 +323,15 @@ impl PrayerMcpServer {
             "step limit reached".to_string()
         };
         let steps = exec_result["steps_executed"].as_u64().unwrap_or(0);
-        let payload = serde_json::json!({
+        let mut payload = serde_json::json!({
             "session": session_handle,
             "script": pretty_script.trim(),
             "status": status,
             "steps": steps,
         });
+        if let Some(diff) = exec_result.get("diff") {
+            payload["diff"] = diff.clone();
+        }
 
         Ok(serde_json::to_string_pretty(&payload).unwrap_or_default())
     }

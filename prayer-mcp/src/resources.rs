@@ -67,12 +67,26 @@ impl ResourceHandler {
     // ── static definitions ────────────────────────────────────────────────────
 
     pub fn static_resources() -> Vec<Resource> {
-        vec![Resource::new(
-            RawResource::new("prayer://dsl/reference", "PrayerLang DSL reference")
-                .with_description("Commands, predicates, and syntax reference")
-                .with_mime_type("text/plain"),
-            None,
-        )]
+        vec![
+            Resource::new(
+                RawResource::new("prayer://dsl/reference", "PrayerLang DSL reference")
+                    .with_description("Commands, predicates, and syntax reference")
+                    .with_mime_type("text/plain"),
+                None,
+            ),
+            Resource::new(
+                RawResource::new("prayer://dsl/overrides", "PrayerLang skill/override reference")
+                    .with_description("Skill library syntax: skill, override, and @disable")
+                    .with_mime_type("text/plain"),
+                None,
+            ),
+            Resource::new(
+                RawResource::new("prayer://tutorials/mining", "Mining tutorial")
+                    .with_description("How to write mining scripts: loops, cargo, stashing, and skills")
+                    .with_mime_type("text/markdown"),
+                None,
+            ),
+        ]
     }
 
     pub fn resource_templates() -> Vec<ResourceTemplate> {
@@ -105,6 +119,22 @@ impl ResourceHandler {
                 body, uri,
             )
             .with_mime_type("text/plain")]));
+        }
+
+        if uri == "prayer://dsl/overrides" {
+            return Ok(ReadResourceResult::new(vec![ResourceContents::text(
+                include_str!("dsl_ref_overrides.txt").to_string(),
+                uri,
+            )
+            .with_mime_type("text/plain")]));
+        }
+
+        if uri == "prayer://tutorials/mining" {
+            return Ok(ReadResourceResult::new(vec![ResourceContents::text(
+                include_str!("tutorial_mining.md").to_string(),
+                uri,
+            )
+            .with_mime_type("text/markdown")]));
         }
 
         Err(rmcp::ErrorData::resource_not_found(
