@@ -22,8 +22,9 @@ use uuid::Uuid;
 
 use crate::state_mapping::map_runtime_state;
 use crate::{
-    ApiError, ExecuteScriptResponse, RuntimeStateResponse, SessionSummary, SetTransportRequest,
-    SkillLibraryTextResponse, StepResponse,
+    ApiError, ExecuteScriptResponse, RuntimeStateResponse, ScriptDiff, ScriptDiffFlags,
+    ScriptLocationDelta, SessionSummary, SetTransportRequest, SkillLibraryTextResponse,
+    StepResponse,
 };
 
 const DEFAULT_EXECUTE_MAX_STEPS: usize = 10_000;
@@ -192,6 +193,66 @@ fn diff_positive_item_deltas(
         }
     }
     deltas
+}
+
+fn diff_item_deltas(before: &HashMap<String, i64>, after: &HashMap<String, i64>) -> Vec<String> {
+    let mut all_keys: std::collections::BTreeSet<String> = before.keys().cloned().collect();
+    all_keys.extend(after.keys().cloned());
+    all_keys
+        .into_iter()
+        .filter_map(|item| {
+            let b = before.get(&item).copied().unwrap_or(0);
+            let a = after.get(&item).copied().unwrap_or(0);
+            if b != a { Some(format!("{item}: {b} -> {a}")) } else { None }
+        })
+        .collect()
+}
+
+fn arrow(before: &Option<String>, after: &Option<String>) -> String {
+    format!(
+        "{} -> {}",
+        before.as_deref().unwrap_or("?"),
+        after.as_deref().unwrap_or("?")
+    )
+}
+
+fn compute_script_diff(before: &GameState, after: &GameState, halted_after: bool) -> ScriptDiff {
+    let docking_changed = before.docked != after.docked;
+
+    let credits = (before.credits != after.credits)
+        .then(|| format!("{} -> {}", before.credits, after.credits));
+    let fuel = (before.fuel_pct != after.fuel_pct)
+        .then(|| format!("{} -> {}", before.fuel_pct, after.fuel_pct));
+
+    let system_changed = before.system != after.system;
+    let poi_changed = before.current_poi != after.current_poi;
+    let location = (system_changed || poi_changed).then(|| ScriptLocationDelta {
+        system: system_changed.then(|| arrow(&before.system, &after.system)),
+        poi: poi_changed.then(|| arrow(&before.current_poi, &after.current_poi)),
+    });
+
+    let cargo = diff_item_deltas(&before.cargo, &after.cargo);
+
+    // Stash visibility is unreliable across a dock/undock transition — suppress to avoid noise.
+    let storage = (!docking_changed).then(|| {
+        diff_item_deltas(
+            &stash_totals_by_item(&before.stash),
+            &stash_totals_by_item(&after.stash),
+        )
+    });
+
+    ScriptDiff {
+        credits,
+        fuel,
+        location,
+        cargo,
+        storage,
+        flags: ScriptDiffFlags {
+            docked_before: before.docked,
+            docked_after: after.docked,
+            halted_after,
+        },
+    }
 }
 
 fn stash_totals_by_item(stash: &HashMap<String, HashMap<String, i64>>) -> HashMap<String, i64> {
@@ -799,6 +860,12 @@ impl RuntimeService {
         let mut error: Option<String> = None;
         let mut halt_message: Option<String> = None;
 
+        let state_before = {
+            let session = self.get_session(id).await?;
+            let session = session.lock().await;
+            if session.has_state { Some(session.effective_state.clone()) } else { None }
+        };
+
         while steps_executed < max_steps {
             let step = match self.execute_step(id).await {
                 Ok(step) => step,
@@ -830,12 +897,24 @@ impl RuntimeService {
         }
 
         let snapshot = self.snapshot(id).await?;
+        let diff = {
+            let session = self.get_session(id).await?;
+            let session = session.lock().await;
+            if session.has_state {
+                state_before.as_ref().map(|before| {
+                    compute_script_diff(before, &session.effective_state, snapshot.is_halted)
+                })
+            } else {
+                None
+            }
+        };
         Ok(ExecuteScriptResponse {
             steps_executed,
             halted: snapshot.is_halted,
             completed: snapshot.is_finished,
             error,
             halt_message,
+            diff,
         })
     }
 

@@ -968,6 +968,46 @@ pub struct StepResponse {
     pub halted: bool,
 }
 
+/// Before/after location. Only emitted when system or POI changed.
+/// Values are formatted as "before -> after".
+#[derive(Debug, Clone, Serialize)]
+pub struct ScriptLocationDelta {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub system: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub poi: Option<String>,
+}
+
+/// State flags captured around script execution.
+#[derive(Debug, Clone, Serialize)]
+pub struct ScriptDiffFlags {
+    pub docked_before: bool,
+    pub docked_after: bool,
+    pub halted_after: bool,
+}
+
+/// Diff of game state before and after script execution.
+/// Scalar fields use "before -> after" format. Item lists use "item: before -> after" format.
+#[derive(Debug, Clone, Serialize)]
+pub struct ScriptDiff {
+    /// Only present when credits changed. Format: "before -> after".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub credits: Option<String>,
+    /// Only present when fuel changed. Format: "before -> after".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fuel: Option<String>,
+    /// Only present when system or POI changed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub location: Option<ScriptLocationDelta>,
+    /// Format per entry: "item: before -> after". Empty when nothing changed.
+    pub cargo: Vec<String>,
+    /// Omitted when docking state changed (stash visibility is unreliable across dock/undock).
+    /// Format per entry: "item: before -> after".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub storage: Option<Vec<String>>,
+    pub flags: ScriptDiffFlags,
+}
+
 /// Response body for script execution runs.
 #[derive(Debug, Clone, Serialize)]
 pub struct ExecuteScriptResponse {
@@ -983,6 +1023,9 @@ pub struct ExecuteScriptResponse {
     /// Result message from the step that caused a halt, if any.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub halt_message: Option<String>,
+    /// State diff from before to after execution. Omitted on transport error before any steps ran.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub diff: Option<ScriptDiff>,
 }
 
 /// Response body for event drains.
