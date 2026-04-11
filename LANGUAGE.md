@@ -13,11 +13,12 @@ Scripts are statement-based.
 Example:
 
 ```prayer
-// mine until cargo is full, then halt
-until CARGO_PCT() >= 100 {
-  mine;
+// mine 50 iron ore
+until MINED(iron_ore) >= 50 {
+  mine iron_ore;
+  go $home;
+  stash;
 }
-halt;
 ```
 
 ## Control flow

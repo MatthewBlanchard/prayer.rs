@@ -290,19 +290,7 @@ These can be shipped before the full pipeline port and unblock later work.
 
 ### Bugs
 
-**MINED / STASHED predicates always return 0**  
-Predicates read `state.last_mined` / `state.last_stashed` (per-turn deltas,
-never populated by transport). Session totals live in the engine's internal
-`mined_by_item` / `stashed_by_item` accumulators but predicates can't see them.
-Scripts using `until MINED(ore) > 5` are silently broken.
-
-Fix: add `script_mined_by_item` / `script_stashed_by_item` to `GameState`.
-Add `engine.inject_session_counters(&mut state)` to copy accumulators in before
-each `decide_next` call. Predicates read from those fields.
-
-**STASH predicate missing**  
-`STASH(poi_id, item_id)` exists in C# but is not registered in
-`install_default_predicates()`. Data is already in `GameState.stash`.
+_(No known bugs at this time.)_
 
 ### Preparatory
 
