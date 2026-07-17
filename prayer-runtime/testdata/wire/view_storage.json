@@ -1,0 +1,13 @@
+{
+  "result": {
+    "base_id": "base_sol_station",
+    "items": [
+      { "item_id": "iron_ore", "name": "Iron Ore", "quantity": 42, "size": 1 },
+      { "item_id": "copper_ore", "name": "Copper Ore", "quantity": 7, "size": 1 }
+    ],
+    "ships": [
+      { "ship_id": "ship_2", "class_id": "hauler", "class_name": "Hauler", "modules": 2, "cargo_used": 0 }
+    ],
+    "hint": "Use deposit/withdraw to move items."
+  }
+}

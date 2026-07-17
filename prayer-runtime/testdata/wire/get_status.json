@@ -1,0 +1,78 @@
+{
+  "result": {
+    "player": {
+      "id": "player_1",
+      "username": "molty",
+      "empire": "solarian",
+      "faction_id": "fac_traders",
+      "faction_rank": "member",
+      "credits": 5230,
+      "home_base": "base_sol_station",
+      "home_poi": "poi_sol_station",
+      "home_system": "sol",
+      "is_cloaked": false,
+      "standings": {
+        "solarian": { "reputation": 12, "baseline": 0, "outstanding_bounty": 0 }
+      }
+    },
+    "ship": {
+      "id": "ship_1",
+      "name": "Rust Bucket",
+      "class_id": "shuttle",
+      "class_name": "Shuttle",
+      "fuel": 80,
+      "max_fuel": 100,
+      "cargo_used": 10,
+      "cargo_capacity": 50,
+      "hull": 95,
+      "max_hull": 100,
+      "shield": 40,
+      "max_shield": 50,
+      "shield_recharge": 2,
+      "armor": 5,
+      "speed": 3,
+      "cpu_used": 4,
+      "cpu_capacity": 10,
+      "power_used": 6,
+      "power_capacity": 12,
+      "weapon_slots": 1,
+      "defense_slots": 1,
+      "utility_slots": 2
+    },
+    "location": {
+      "system_id": "sol",
+      "system_name": "Sol",
+      "poi_id": "poi_sol_station",
+      "poi_name": "Sol Station",
+      "poi_type": "station",
+      "docked_at": "base_sol_station",
+      "empire": "solarian",
+      "security_status": "high",
+      "in_transit": false,
+      "connections": ["alpha", "barnard"]
+    },
+    "cargo": [
+      { "item_id": "iron_ore", "item_name": "Iron Ore", "quantity": 8, "size": 1 },
+      { "item_id": "water", "item_name": "Water", "quantity": 2, "size": 1 }
+    ],
+    "missions": {
+      "active": [],
+      "max_missions": 3
+    },
+    "skills": {
+      "mining": {
+        "name": "Mining",
+        "category": "industry",
+        "level": 2,
+        "max_level": 10,
+        "xp": 120,
+        "next_level_xp": 200
+      }
+    },
+    "modules": [
+      { "module_id": "mod_mining_laser_1", "name": "Mining Laser I", "slot": "utility" }
+    ],
+    "queue": { "has_pending": false },
+    "version": "2"
+  }
+}

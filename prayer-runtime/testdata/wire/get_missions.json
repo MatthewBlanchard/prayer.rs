@@ -1,0 +1,56 @@
+{
+  "result": {
+    "base_id": "base_sol_station",
+    "base_name": "Sol Central",
+    "missions": [
+      {
+        "mission_id": "m_avail_1",
+        "template_id": "tpl_first_haul",
+        "type": "delivery",
+        "title": "First Haul",
+        "description": "Deliver ore to the outpost.",
+        "difficulty": 1,
+        "expires_in_ticks": 720,
+        "issuing_base": "Sol Central",
+        "issuing_base_id": "base_sol_station",
+        "issuing_system_id": "sol",
+        "issuing_system_name": "Sol",
+        "giver": { "name": "Quartermaster", "title": "Logistics" },
+        "objectives": [
+          {
+            "type": "deliver",
+            "description": "Deliver 5 Iron Ore to Sol Outpost Base",
+            "item_id": "iron_ore",
+            "quantity": 5,
+            "target_base_id": "base_sol_outpost",
+            "target_base_name": "Sol Outpost Base"
+          }
+        ],
+        "rewards": { "credits": 7500 },
+        "repeatable": true,
+        "chain_next": "m_avail_2",
+        "faction_id": "fac_traders",
+        "faction_name": "Traders Guild",
+        "provided_items": { "iron_ore": 5 },
+        "warnings": ["Cargo space required: 5"]
+      },
+      {
+        "mission_id": "m_avail_2",
+        "template_id": "tpl_survey_run",
+        "type": "explore",
+        "title": "Survey Run",
+        "description": "Survey the Alpha Centauri system.",
+        "difficulty": 2,
+        "expires_in_ticks": 1440,
+        "giver": { "name": "Cartographer", "title": "Survey Division" },
+        "objectives": [
+          { "type": "survey", "description": "Survey Alpha Centauri", "system_id": "alpha", "system_name": "Alpha Centauri" }
+        ],
+        "rewards": { "credits": 3000, "skill_xp": { "navigation": 50 } },
+        "required_modules": ["mod_surveyor_1"],
+        "faction_id": "",
+        "faction_name": ""
+      }
+    ]
+  }
+}

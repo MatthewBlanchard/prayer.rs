@@ -1,0 +1,49 @@
+{
+  "result": {
+    "action": "view_market",
+    "base": "Sol Central",
+    "base_id": "base_sol_station",
+    "categories": ["ore", "consumable"],
+    "items": [
+      {
+        "item_id": "iron_ore",
+        "item_name": "Iron Ore",
+        "category": "ore",
+        "sell_orders": [
+          { "price_each": 14, "quantity": 120, "source": "player" },
+          { "price_each": 15, "quantity": 60, "source": "npc" }
+        ],
+        "buy_orders": [
+          { "price_each": 11, "quantity": 200, "source": "npc" }
+        ],
+        "best_sell": 14,
+        "best_buy": 11,
+        "sell_quantity": 180,
+        "sell_price": 14,
+        "best_sell_qty": 120,
+        "buy_quantity": 200,
+        "buy_price": 11,
+        "best_buy_qty": 200,
+        "spread": 3
+      },
+      {
+        "item_id": "fuel_cell",
+        "item_name": "Fuel Cell",
+        "category": "consumable",
+        "sell_orders": [
+          { "price_each": 32, "quantity": 40, "source": "npc" }
+        ],
+        "buy_orders": [],
+        "best_sell": 32,
+        "best_buy": 0,
+        "sell_quantity": 40,
+        "sell_price": 32,
+        "best_sell_qty": 40,
+        "buy_quantity": 0,
+        "buy_price": 0,
+        "best_buy_qty": 0,
+        "spread": 0
+      }
+    ]
+  }
+}

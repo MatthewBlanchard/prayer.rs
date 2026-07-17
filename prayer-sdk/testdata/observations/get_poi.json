@@ -1,0 +1,1 @@
+{"kind":"normal","poi":{"description":"Rich asteroid field","id":"belt_1","name":"Main Belt","position":{"x":1.0,"y":0.0},"resources":[{"remaining":900,"resource_id":"iron_ore","richness":"8"}],"system_id":"sol","type":"asteroid_field"},"resources":[{"name":"Iron Ore","remaining":900,"remaining_display":"900","resource_id":"iron_ore","richness":8}]}

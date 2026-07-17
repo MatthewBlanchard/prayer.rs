@@ -1,0 +1,54 @@
+{
+  "name": "reference-client-ts",
+  "version": "1.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22",
+    "npm": ">=10 <12"
+  },
+  "scripts": {
+    "dev:server": "tsx watch src/server/index.ts",
+    "dev:client": "vite",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "typecheck:client": "tsc -p tsconfig.client.json --noEmit",
+    "typecheck:server": "tsc -p tsconfig.server.json --noEmit && tsc -p tsconfig.plugins.json --noEmit",
+    "typecheck": "npm run typecheck:client && npm run typecheck:server",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint . --max-warnings 0",
+    "audit:types": "node scripts/audit-client-types.mjs",
+    "build": "npm run typecheck && vite build && tsc -p tsconfig.server.json && tsc -p tsconfig.plugins.json && node scripts/build-plugins.mjs",
+    "test": "node scripts/run-tests.mjs",
+    "test:coverage": "node scripts/run-tests.mjs --coverage",
+    "check": "npm run format:check && npm run lint && npm run audit:types && npm run typecheck && npm run test:coverage && npm run build",
+    "start": "node dist/server/server/index.js"
+  },
+  "dependencies": {
+    "@prayer/sdk": "file:../prayer-sdk-ts",
+    "@types/three": "^0.185.1",
+    "express": "^4.19.0",
+    "lucide-react": "^1.22.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.0.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@types/supertest": "^7.2.1",
+    "@vitejs/plugin-react": "^4.3.0",
+    "concurrently": "^9.0.0",
+    "eslint": "^10.7.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.3",
+    "prettier": "^3.9.5",
+    "supertest": "^7.2.2",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "typescript-eslint": "^8.64.0",
+    "vite": "^5.4.0"
+  }
+}

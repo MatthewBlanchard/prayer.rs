@@ -1,0 +1,17 @@
+[package]
+name = "prayer-lang"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+ariadne.workspace = true
+chumsky.workspace = true
+serde.workspace = true
+prayer-actions.workspace = true
+thiserror.workspace = true

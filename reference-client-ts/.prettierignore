@@ -1,0 +1,5 @@
+dist
+node_modules
+.prayer-client-*.json
+.prayer-mcp-client-*.json
+package-lock.json

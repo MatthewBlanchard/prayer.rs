@@ -1,0 +1,100 @@
+[workspace]
+members = [
+  "spacemolt-lib-rs",
+  "prayer-actions",
+  "prayer-state",
+  "prayer-lang",
+  "prayer-scheduler",
+  "prayer-runtime",
+  "prayer-api-contracts",
+  "prayer-sdk",
+  "prayer-api",
+  "xtask",
+]
+resolver = "2"
+
+# Keep local build artifacts bounded. Full debuginfo and incremental caches grow
+# quickly in this generated-code-heavy workspace; line-level debuginfo preserves
+# useful backtraces while avoiding most of that disk usage.
+[profile.dev]
+debug = 1
+incremental = false
+
+[profile.test]
+debug = 1
+incremental = false
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.78"
+license = "MIT"
+authors = ["Prayer Runtime Team"]
+
+[workspace.dependencies]
+ariadne = "0.5"
+axum = { version = "0.7", features = ["macros", "json"] }
+chumsky = "0.10"
+serde = { version = "1", features = ["derive", "rc"] }
+serde_json = "1"
+thiserror = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "net"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+async-trait = "0.1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "gzip"] }
+parking_lot = "0.12"
+indexmap = { version = "2", features = ["serde"] }
+chrono = { version = "0.4", features = ["serde", "clock"] }
+clap = { version = "4", features = ["derive", "env"] }
+regex = "1"
+regress = "0.11"
+globset = "0.4"
+anyhow = "1"
+dirs = "5"
+tower-http = { version = "0.6", features = ["cors"] }
+futures-util = "0.3"
+tokio-tungstenite = { version = "0.24", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
+typify = "0.7"
+schemars = { version = "0.8", features = ["chrono", "uuid1"] }
+prettyplease = "0.2"
+syn = "2"
+heck = "0.5"
+prayer-actions = { path = "prayer-actions" }
+prayer-state = { path = "prayer-state" }
+prayer-lang = { path = "prayer-lang" }
+prayer-scheduler = { path = "prayer-scheduler" }
+prayer-runtime = { path = "prayer-runtime" }
+prayer-api-contracts = { path = "prayer-api-contracts" }
+prayer-sdk = { path = "prayer-sdk" }
+
+[workspace.lints.clippy]
+unwrap_used = "allow"
+todo = "deny"
+panic = "allow"
+derivable_impls = "allow"
+incompatible_msrv = "allow"
+large_enum_variant = "allow"
+needless_return = "allow"
+obfuscated_if_else = "allow"
+result_large_err = "allow"
+too_many_arguments = "allow"
+type_complexity = "allow"
+unnecessary_sort_by = "allow"
+default_constructed_unit_structs = "allow"
+len_without_is_empty = "allow"
+clone_on_copy = "allow"
+collapsible_if = "allow"
+field_reassign_with_default = "allow"
+if_same_then_else = "allow"
+items_after_test_module = "allow"
+manual_flatten = "allow"
+map_entry = "allow"
+needless_ifs = "allow"
+needless_option_as_deref = "allow"
+nonminimal_bool = "allow"
+question_mark = "allow"
+unnecessary_lazy_evaluations = "allow"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"

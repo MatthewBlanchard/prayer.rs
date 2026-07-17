@@ -1,0 +1,29 @@
+{
+  "result": {
+    "poi": {
+      "id": "poi_main_belt",
+      "system_id": "sol",
+      "type": "asteroid_belt",
+      "name": "Main Belt",
+      "description": "A dense asteroid belt.",
+      "position": { "x": 3.0, "y": 4.0 }
+    },
+    "resources": [
+      {
+        "resource_id": "iron_ore",
+        "name": "Iron Ore",
+        "richness": 3,
+        "remaining": 5000,
+        "remaining_display": "plentiful"
+      },
+      {
+        "resource_id": "water_ice",
+        "name": "Water Ice",
+        "richness": 2,
+        "remaining": 2500,
+        "remaining_display": "moderate"
+      }
+    ],
+    "services": []
+  }
+}

@@ -1,0 +1,30 @@
+name: Cross-platform clean clone
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  clean-clone:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.78'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: cargo xtask bootstrap
+      - run: cargo xtask build
+      - name: Verify generated files and worktree stay clean
+        shell: pwsh
+        run: |
+          if (git status --porcelain) {
+            git diff
+            throw "repository changed during checks"
+          }

@@ -1,0 +1,41 @@
+{
+  "result": {
+    "systems": [
+      {
+        "system_id": "sol",
+        "name": "Sol",
+        "position": { "x": 0.0, "y": 0.0 },
+        "connections": ["alpha", "barnard"],
+        "empire": "solarian",
+        "visited": true,
+        "visited_at": "2026-06-01T00:00:00Z",
+        "poi_count": 5,
+        "online": 12
+      },
+      {
+        "system_id": "alpha",
+        "name": "Alpha Centauri",
+        "position": { "x": 1.0, "y": 0.5 },
+        "connections": ["sol"],
+        "empire": "solarian",
+        "visited": false,
+        "visited_at": "",
+        "poi_count": 3,
+        "online": 2
+      },
+      {
+        "system_id": "barnard",
+        "name": "Barnard's Star",
+        "position": { "x": -1.5, "y": 2.0 },
+        "connections": ["sol"],
+        "empire": "",
+        "visited": false,
+        "visited_at": "",
+        "poi_count": 2,
+        "online": 0,
+        "is_stronghold": false
+      }
+    ],
+    "total_count": 3
+  }
+}

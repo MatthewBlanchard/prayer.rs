@@ -1,0 +1,63 @@
+{
+  "result": {
+    "action": "get_system",
+    "security_status": "high",
+    "system": {
+      "id": "sol",
+      "name": "Sol",
+      "empire": "solarian",
+      "police_level": 3,
+      "security_status": "high",
+      "description": "Cradle of humanity.",
+      "connections": [
+        { "system_id": "alpha", "name": "Alpha Centauri", "distance": 1 },
+        { "system_id": "barnard", "name": "Barnard's Star", "distance": 2 }
+      ],
+      "pois": [
+        {
+          "id": "poi_sol_station",
+          "name": "Sol Station",
+          "type": "station",
+          "position": { "x": 1.0, "y": 2.0 },
+          "has_base": true,
+          "base_id": "base_sol_station",
+          "base_name": "Sol Central",
+          "online": 4,
+          "fuel_reserve": 1000,
+          "fuel_price": 7
+        },
+        {
+          "id": "poi_main_belt",
+          "name": "Main Belt",
+          "type": "asteroid_belt",
+          "position": { "x": 3.0, "y": 4.0 },
+          "has_base": false,
+          "online": 0,
+          "fuel_reserve": 0
+        },
+        {
+          "id": "poi_sol_outpost",
+          "name": "Sol Outpost",
+          "type": "moon",
+          "position": { "x": 5.0, "y": 6.0 },
+          "has_base": true,
+          "base_id": "base_sol_outpost",
+          "base_name": "Sol Outpost Base",
+          "online": 1,
+          "fuel_reserve": 200
+        }
+      ]
+    },
+    "poi": {
+      "id": "poi_sol_station",
+      "name": "Sol Station",
+      "type": "station",
+      "position": { "x": 1.0, "y": 2.0 },
+      "has_base": true,
+      "base_id": "base_sol_station",
+      "base_name": "Sol Central",
+      "online": 4,
+      "fuel_reserve": 1000
+    }
+  }
+}

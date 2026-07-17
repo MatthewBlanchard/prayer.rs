@@ -1,0 +1,527 @@
+{
+  "source_version": "0.452.0",
+  "root_counts": {
+    "items": 636,
+    "ships": 331,
+    "recipes": 653,
+    "facilities": 2541,
+    "skills": 30
+  },
+  "root_keys": [
+    "facilities",
+    "items",
+    "recipes",
+    "ships",
+    "skills",
+    "version"
+  ],
+  "schemas": {
+    "items": {
+      "id": [
+        "string"
+      ],
+      "name": [
+        "string"
+      ],
+      "description": [
+        "string"
+      ],
+      "category": [
+        "string"
+      ],
+      "size": [
+        "number"
+      ],
+      "base_value": [
+        "number"
+      ],
+      "stackable": [
+        "boolean"
+      ],
+      "tradeable": [
+        "boolean"
+      ],
+      "rarity": [
+        "string"
+      ],
+      "extracted_by": [
+        "string"
+      ],
+      "type_id": [
+        "string"
+      ],
+      "type": [
+        "string"
+      ],
+      "slot": [
+        "string"
+      ],
+      "cpu_usage": [
+        "number"
+      ],
+      "power_usage": [
+        "number"
+      ],
+      "shield_bonus": [
+        "number"
+      ],
+      "special": [
+        "string"
+      ],
+      "required_skills": [
+        "object"
+      ],
+      "effect": [
+        "object"
+      ],
+      "drone_capacity": [
+        "number"
+      ],
+      "drone_bandwidth": [
+        "number"
+      ],
+      "tow_speed_penalty": [
+        "number"
+      ],
+      "speed_bonus": [
+        "number"
+      ],
+      "fuel_efficiency": [
+        "number"
+      ],
+      "region_lock": [
+        "array<string>"
+      ],
+      "armor_bonus": [
+        "number"
+      ],
+      "speed_penalty": [
+        "number"
+      ],
+      "armor_repair_rate": [
+        "number"
+      ],
+      "damage": [
+        "number"
+      ],
+      "damage_type": [
+        "string"
+      ],
+      "ammo_type": [
+        "string"
+      ],
+      "range": [
+        "number"
+      ],
+      "reach": [
+        "number"
+      ],
+      "cooldown": [
+        "number"
+      ],
+      "magazine_size": [
+        "number"
+      ],
+      "passenger_business_berths": [
+        "number"
+      ],
+      "cargo_bonus": [
+        "number"
+      ],
+      "hazardous": [
+        "boolean"
+      ],
+      "cloak_strength": [
+        "number"
+      ],
+      "passive_recipe": [
+        "string"
+      ],
+      "cpu_bonus": [
+        "number"
+      ],
+      "hull_bonus": [
+        "number"
+      ],
+      "damage_reduction": [
+        "number"
+      ],
+      "mining_power": [
+        "number"
+      ],
+      "quest_item": [
+        "boolean"
+      ],
+      "survey_power": [
+        "number"
+      ],
+      "survey_range": [
+        "number"
+      ],
+      "passenger_economy_berths": [
+        "number"
+      ],
+      "resistance_bonus": [
+        "object"
+      ],
+      "max_fuel_bonus": [
+        "number"
+      ],
+      "hull_penalty": [
+        "number"
+      ],
+      "passenger_first_berths": [
+        "number"
+      ],
+      "shield_bypass_bonus": [
+        "number"
+      ],
+      "armor_bypass_bonus": [
+        "number"
+      ],
+      "power_bonus": [
+        "number"
+      ],
+      "shield_recharge_bonus": [
+        "number"
+      ],
+      "remote_repair_power": [
+        "number"
+      ],
+      "scanner_power": [
+        "number"
+      ],
+      "webify_strength": [
+        "number"
+      ],
+      "signature_bonus": [
+        "number"
+      ],
+      "tracking_bonus": [
+        "number"
+      ],
+      "accuracy_bonus": [
+        "number"
+      ],
+      "warp_stabilization": [
+        "number"
+      ],
+      "disruptor_power": [
+        "number"
+      ],
+      "scramble_power": [
+        "number"
+      ]
+    },
+    "ships": {
+      "id": [
+        "string"
+      ],
+      "name": [
+        "string"
+      ],
+      "description": [
+        "string"
+      ],
+      "class": [
+        "string"
+      ],
+      "price": [
+        "number"
+      ],
+      "tier": [
+        "number"
+      ],
+      "scale": [
+        "number"
+      ],
+      "faction": [
+        "string"
+      ],
+      "category": [
+        "string"
+      ],
+      "lore": [
+        "string"
+      ],
+      "base_hull": [
+        "number"
+      ],
+      "base_shield": [
+        "number"
+      ],
+      "base_shield_recharge": [
+        "number"
+      ],
+      "base_armor": [
+        "number"
+      ],
+      "base_speed": [
+        "number"
+      ],
+      "base_fuel": [
+        "number"
+      ],
+      "cargo_capacity": [
+        "number"
+      ],
+      "cpu_capacity": [
+        "number"
+      ],
+      "power_capacity": [
+        "number"
+      ],
+      "weapon_slots": [
+        "number"
+      ],
+      "defense_slots": [
+        "number"
+      ],
+      "utility_slots": [
+        "number"
+      ],
+      "default_modules": [
+        "array<string>"
+      ],
+      "inherent_capabilities": [
+        "array<object>"
+      ],
+      "shipyard_tier": [
+        "number"
+      ],
+      "build_materials": [
+        "array<object>"
+      ],
+      "build_time": [
+        "number"
+      ],
+      "flavor_tags": [
+        "array<string>"
+      ],
+      "piloting_required": [
+        "number"
+      ],
+      "passive_recipes": [
+        "array<string>"
+      ],
+      "required_reputation": [
+        "number"
+      ],
+      "tow_speed_bonus": [
+        "number"
+      ],
+      "default_loadout_version": [
+        "number"
+      ],
+      "npc_role": [
+        "string"
+      ],
+      "based_on": [
+        "string"
+      ],
+      "special": [
+        "string"
+      ],
+      "starter_ship": [
+        "boolean"
+      ],
+      "required_achievement": [
+        "string"
+      ],
+      "prestige_lock": [
+        "string"
+      ],
+      "required_faction_achievement": [
+        "string"
+      ],
+      "required_faction_leader": [
+        "boolean"
+      ]
+    },
+    "recipes": {
+      "id": [
+        "string"
+      ],
+      "name": [
+        "string"
+      ],
+      "description": [
+        "string"
+      ],
+      "category": [
+        "string"
+      ],
+      "inputs": [
+        "array<>",
+        "array<object>"
+      ],
+      "outputs": [
+        "array<>",
+        "array<object>"
+      ],
+      "crafting_time": [
+        "number"
+      ],
+      "no_recycle": [
+        "boolean"
+      ],
+      "facility_only": [
+        "boolean"
+      ],
+      "fuel_output": [
+        "number"
+      ]
+    },
+    "facilities": {
+      "id": [
+        "string"
+      ],
+      "name": [
+        "string"
+      ],
+      "description": [
+        "string"
+      ],
+      "category": [
+        "string"
+      ],
+      "level": [
+        "number"
+      ],
+      "upgrades_from": [
+        "string"
+      ],
+      "recipe_id": [
+        "string"
+      ],
+      "always_on": [
+        "boolean"
+      ],
+      "build_cost": [
+        "number"
+      ],
+      "build_materials": [
+        "array<object>"
+      ],
+      "build_time": [
+        "number"
+      ],
+      "labor_cost": [
+        "number"
+      ],
+      "power_draw": [
+        "number"
+      ],
+      "life_support_draw": [
+        "number"
+      ],
+      "satisfied_description": [
+        "string"
+      ],
+      "degraded_description": [
+        "string"
+      ],
+      "service_type": [
+        "string"
+      ],
+      "maintenance_inputs": [
+        "array<object>"
+      ],
+      "pirate_base_only": [
+        "boolean"
+      ],
+      "battery_capacity": [
+        "number"
+      ],
+      "life_support_supply": [
+        "number"
+      ],
+      "fuel_output": [
+        "boolean"
+      ],
+      "station_or_faction_only": [
+        "boolean"
+      ],
+      "requires_service_type": [
+        "string"
+      ],
+      "faction_service_type": [
+        "string"
+      ],
+      "faction_cap": [
+        "number"
+      ],
+      "personal_service_type": [
+        "string"
+      ],
+      "personal_bonus_type": [
+        "string"
+      ],
+      "personal_bonus_value": [
+        "number"
+      ],
+      "fuel_capacity": [
+        "number"
+      ],
+      "empire": [
+        "string"
+      ],
+      "fleet_upkeep": [
+        "boolean"
+      ],
+      "unique": [
+        "boolean"
+      ],
+      "lore": [
+        "string"
+      ],
+      "scan_power": [
+        "number"
+      ],
+      "scan_falloff": [
+        "number"
+      ],
+      "power_supply": [
+        "number"
+      ],
+      "expansion_of": [
+        "string"
+      ],
+      "expansion_scale": [
+        "number"
+      ],
+      "allows_contraband": [
+        "boolean"
+      ]
+    },
+    "skills": {
+      "id": [
+        "string"
+      ],
+      "name": [
+        "string"
+      ],
+      "description": [
+        "string"
+      ],
+      "category": [
+        "string"
+      ],
+      "max_level": [
+        "number"
+      ],
+      "bonus_per_level": [
+        "object"
+      ],
+      "xp_per_level": [
+        "array<number>"
+      ],
+      "training_source": [
+        "string"
+      ],
+      "empire_restriction": [
+        "string"
+      ]
+    }
+  }
+}

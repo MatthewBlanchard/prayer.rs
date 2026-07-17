@@ -1,0 +1,36 @@
+[package]
+name = "prayer-sdk"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Embeddable application facade for Prayer"
+
+[lints]
+workspace = true
+
+[features]
+test-support = []
+
+[dependencies]
+prayer-api-contracts.workspace = true
+prayer-runtime.workspace = true
+prayer-state.workspace = true
+prayer-actions.workspace = true
+prayer-lang.workspace = true
+prayer-scheduler.workspace = true
+spacemolt-lib-rs = { path = "../spacemolt-lib-rs" }
+serde.workspace = true
+serde_json.workspace = true
+schemars.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+parking_lot.workspace = true
+tracing.workspace = true
+dirs.workspace = true
+
+[dev-dependencies]
+async-trait.workspace = true

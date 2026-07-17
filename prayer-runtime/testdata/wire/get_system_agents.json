@@ -1,0 +1,40 @@
+{
+  "result": {
+    "system_id": "sol",
+    "count": 3,
+    "offline_collapsed": 1,
+    "agents": [
+      {
+        "player_id": "p_rustler",
+        "username": "OreRustler",
+        "faction_id": "fac_traders",
+        "faction_tag": "TRD",
+        "clan_tag": "RUST",
+        "ship_class": "hauler",
+        "ship_name": "Heavy Lifter",
+        "status_message": "hauling ore, do not disturb",
+        "primary_color": "#aa3322",
+        "secondary_color": "#112233",
+        "in_combat": false,
+        "offline": false
+      },
+      {
+        "player_id": "p_ghost",
+        "username": "GhostPilot",
+        "ship_class": "shuttle",
+        "in_combat": true,
+        "offline": false
+      },
+      {
+        "username": "SleepyMolt",
+        "faction_id": "fac_miners",
+        "faction_tag": "MIN",
+        "in_combat": false,
+        "offline": true
+      },
+      {
+        "in_combat": false
+      }
+    ]
+  }
+}

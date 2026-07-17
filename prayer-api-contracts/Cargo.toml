@@ -1,0 +1,22 @@
+[package]
+name = "prayer-api-contracts"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Shared HTTP contracts for the Prayer API"
+
+[lints]
+workspace = true
+
+[dependencies]
+prayer-runtime.workspace = true
+prayer-state.workspace = true
+prayer-actions.workspace = true
+spacemolt-lib-rs = { path = "../spacemolt-lib-rs" }
+serde.workspace = true
+serde_json.workspace = true
+schemars.workspace = true
+uuid.workspace = true
+chrono.workspace = true

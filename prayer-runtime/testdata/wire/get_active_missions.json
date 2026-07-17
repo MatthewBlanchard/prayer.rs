@@ -1,0 +1,56 @@
+{
+  "result": {
+    "missions": {
+      "active": [
+        {
+          "mission_id": "m_active_1",
+          "template_id": "tpl_dock_tutorial",
+          "type": "tutorial",
+          "title": "Welcome to Sol Central",
+          "description": "Dock at Sol Central to meet station operations.",
+          "difficulty": 1,
+          "expires_in_ticks": 480,
+          "accepted_at": "2026-06-09T00:00:00Z",
+          "issuing_base": "Sol Central",
+          "issuing_base_id": "base_sol_station",
+          "giver": { "name": "Controller", "title": "Station Ops" },
+          "objectives": [
+            { "type": "dock", "description": "Dock at Sol Central" }
+          ],
+          "percent_complete": 100,
+          "rewards": { "credits": 500 },
+          "faction_id": "",
+          "faction_name": ""
+        },
+        {
+          "mission_id": "m_active_2",
+          "template_id": "tpl_haul_ore",
+          "type": "delivery",
+          "title": "Ore Run",
+          "description": "Deliver 10 iron ore to Sol Outpost.",
+          "difficulty": 2,
+          "expires_in_ticks": 960,
+          "accepted_at": "2026-06-10T00:00:00Z",
+          "issuing_base": "Sol Central",
+          "issuing_base_id": "base_sol_station",
+          "giver": { "name": "Quartermaster", "title": "Logistics" },
+          "objectives": [
+            {
+              "type": "deliver",
+              "description": "Deliver 10 Iron Ore to Sol Outpost Base",
+              "item_id": "iron_ore",
+              "quantity": 10,
+              "target_base_id": "base_sol_outpost",
+              "target_base_name": "Sol Outpost Base"
+            }
+          ],
+          "percent_complete": 40,
+          "rewards": { "credits": 1500, "items": { "fuel_cell": 2 } },
+          "faction_id": "fac_traders",
+          "faction_name": "Traders Guild"
+        }
+      ],
+      "max_missions": 3
+    }
+  }
+}

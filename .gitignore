@@ -1,0 +1,59 @@
+# Rust build output
+/target/
+/dhat-heap.json
+
+# Node / TypeScript client
+/reference-client-ts/node_modules/
+/reference-client-ts/dist/
+/reference-client-ts/.prayer-client-config.json
+/reference-client-ts/.prayer-client-jobs.json
+/reference-client-ts/.prayer-client-arbitrage-profit.json
+/reference-client-ts/.prayer-client-bot-skills.json
+/reference-client-ts/.prayer-client-*.json
+/reference-client-ts/.prayer-client-*.json.archived-*
+# Ignore legacy state files left by the removed MCP client.
+/reference-client-ts/.prayer-mcp-client-*.json
+/reference-client-ts/.prayer-mcp-client-*.json.archived-*
+/reference-client-ts/.prayer-client-*.json
+/reference-client-ts/logs/
+/reference-client-ts/plugins/PikeProprietary/
+/prayer-sdk-ts/node_modules/
+/prayer-sdk-ts/dist/
+
+# Logs
+/logs/
+*.log
+
+# Python
+__pycache__/
+*.pyc
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Claw / Codex
+.claw/
+.codex
+.config/
+.scratchpad/
+.chromium-debug/
+
+# Local documentation archive
+/.docs-archive/
+
+# Claude Code sandbox
+.sandbox-home/
+.sandbox-tmp/
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db

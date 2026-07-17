@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "dist/plugin-runtime",
+    "rootDir": "."
+  },
+  "include": ["plugins/**/server.ts", "src/plugin-api/**/*.ts", "src/server/job-runner/types.ts"],
+  "exclude": ["**/*.test.ts", "**/*.test.tsx", "plugins/**/*.tsx", "node_modules", "dist"]
+}

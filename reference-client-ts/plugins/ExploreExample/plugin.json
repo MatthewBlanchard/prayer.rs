@@ -1,0 +1,7 @@
+{
+  "id": "explore_example",
+  "version": "1.0.0",
+  "hostApiVersion": 1,
+  "server": "./server.ts",
+  "capabilities": ["jobs"]
+}

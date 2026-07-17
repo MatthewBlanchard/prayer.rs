@@ -1,0 +1,11 @@
+{
+  "result": {
+    "action": "get_system",
+    "in_transit": true,
+    "transit_type": "jump",
+    "from_system": "sol",
+    "to_system": "alpha",
+    "ticks_remaining": 2,
+    "message": "In transit to Alpha Centauri."
+  }
+}

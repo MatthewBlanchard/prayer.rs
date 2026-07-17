@@ -1,0 +1,25 @@
+{
+  "result": {
+    "type": "items",
+    "page": 1,
+    "page_size": 50,
+    "total": 2,
+    "total_pages": 1,
+    "items": [
+      {
+        "id": "iron_ore",
+        "name": "Iron Ore",
+        "category": "ore",
+        "base_value": 10,
+        "description": "Common ferrous ore."
+      },
+      {
+        "id": "fuel_cell",
+        "name": "Fuel Cell",
+        "category": "consumable",
+        "base_value": 30,
+        "description": "Standard ship fuel."
+      }
+    ]
+  }
+}

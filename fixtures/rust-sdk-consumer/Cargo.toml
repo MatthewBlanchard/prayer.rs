@@ -1,0 +1,10 @@
+[package]
+name = "prayer-sdk-external-consumer"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+prayer-sdk = { path = "../../prayer-sdk" }
+
+[workspace]
