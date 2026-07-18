@@ -65,6 +65,17 @@ pub fn merge_knowledge_state_with_metadata(
         }
 
         if galaxy != *knowledge.galaxy {
+            let routing_changed = galaxy.system_records.len()
+                != knowledge.galaxy.system_records.len()
+                || galaxy.system_records.iter().any(|(id, system)| {
+                    knowledge.galaxy.system_records.get(id).is_none_or(|known| {
+                        known.connections != system.connections
+                            || known.is_stronghold != system.is_stronghold
+                    })
+                });
+            if routing_changed {
+                galaxy.invalidate_routes();
+            }
             knowledge.galaxy = Arc::new(galaxy);
             versioned_changed = true;
         }
@@ -695,6 +706,69 @@ mod canonical_merge_tests {
         let version = knowledge.knowledge_version;
         assert!(!merge_knowledge_state_if_changed(&mut knowledge, &value));
         assert_eq!(knowledge.knowledge_version, version);
+    }
+
+    #[test]
+    fn changed_connections_invalidate_the_warmed_route_table() {
+        let mut knowledge = WorldState {
+            galaxy: Arc::new(GalaxyData {
+                system_records: HashMap::from([
+                    (
+                        "alpha".into(),
+                        prayer_state::SystemKnowledge {
+                            id: "alpha".into(),
+                            connections: vec!["old_neighbor".into()],
+                            connections_complete: true,
+                            observed_at_unix: 1,
+                            ..Default::default()
+                        },
+                    ),
+                    (
+                        "old_neighbor".into(),
+                        prayer_state::SystemKnowledge {
+                            id: "old_neighbor".into(),
+                            observed_at_unix: 1,
+                            ..Default::default()
+                        },
+                    ),
+                ]),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        assert_eq!(
+            knowledge.galaxy.shortest_path_hops("alpha", "old_neighbor"),
+            Some(vec!["old_neighbor".into()])
+        );
+
+        let changed = StateObservation {
+            world: WorldObservation {
+                galaxy: Arc::new(GalaxyData {
+                    system_records: HashMap::from([(
+                        "alpha".into(),
+                        prayer_state::SystemKnowledge {
+                            id: "alpha".into(),
+                            connections: vec!["new_neighbor".into()],
+                            connections_complete: true,
+                            observed_at_unix: 2,
+                            ..Default::default()
+                        },
+                    )]),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        assert!(merge_knowledge_state_if_changed(&mut knowledge, &changed));
+        assert_eq!(
+            knowledge.galaxy.shortest_path_hops("alpha", "new_neighbor"),
+            Some(vec!["new_neighbor".into()])
+        );
+        assert_eq!(
+            knowledge.galaxy.shortest_path_hops("alpha", "old_neighbor"),
+            None
+        );
     }
 
     #[test]

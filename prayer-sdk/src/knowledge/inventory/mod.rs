@@ -723,9 +723,10 @@ impl RuntimeService {
         );
         drop(_gate);
         if let Some(movement) = result.movement.as_ref() {
-            let mut knowledge = self.knowledge_state.write();
-            knowledge.knowledge_version = knowledge.knowledge_version.saturating_add(1);
-            drop(knowledge);
+            {
+                let mut knowledge = self.knowledge_state.write();
+                knowledge.knowledge_version = knowledge.knowledge_version.saturating_add(1);
+            }
             let session = self.get_session(movement.session_id).await?;
             session.lock().await.active_movement_id = Some(movement.movement_id);
         }
@@ -750,9 +751,10 @@ impl RuntimeService {
             .ok_or_else(|| {
                 SdkError::BadRequest(format!("unknown inventory movement '{movement_id}'"))
             })?;
-        let mut knowledge = self.knowledge_state.write();
-        knowledge.knowledge_version = knowledge.knowledge_version.saturating_add(1);
-        drop(knowledge);
+        {
+            let mut knowledge = self.knowledge_state.write();
+            knowledge.knowledge_version = knowledge.knowledge_version.saturating_add(1);
+        }
         match status {
             RuntimeInventoryMovementStatusDto::Completed => {
                 self.settle_virtual_order_uses(&movement.virtual_order_uses, true);
