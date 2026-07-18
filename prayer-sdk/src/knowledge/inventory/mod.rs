@@ -2,7 +2,7 @@
 
 use std::collections::HashSet;
 
-use prayer_runtime::{BotState, GalaxyData};
+use prayer_runtime::{BotState, GalaxyData, MarketData};
 use tracing::debug;
 use uuid::Uuid;
 
@@ -32,6 +32,32 @@ pub struct InventoryReservationLedger {
 }
 
 impl InventoryReservationLedger {
+    pub fn has_active_market_reservations(&self) -> bool {
+        self.inner.movements().iter().any(|movement| {
+            movement.status.is_active()
+                && movement.claims.iter().any(|claim| {
+                    matches!(claim.source_kind.as_str(), "market" | "market_bid")
+                        && claim.quantity > 0
+                })
+        })
+    }
+
+    /// Subtract active physical market claims from projected order-book depth.
+    /// Claims are compound-keyed rather than price-level keyed, so consume the
+    /// economically best rows first, matching arbitrage package construction.
+    pub fn apply_market_reservations(&self, market: &mut MarketData) {
+        for (station, snapshot) in &mut market.station_markets {
+            for (item_id, orders) in &mut snapshot.sell_orders {
+                let reserved = self.reserved_for_compound("market", "market", station, item_id);
+                subtract_reserved_market_depth(orders, reserved, false);
+            }
+            for (item_id, orders) in &mut snapshot.buy_orders {
+                let reserved = self.reserved_for_compound("market_bid", "market", station, item_id);
+                subtract_reserved_market_depth(orders, reserved, true);
+            }
+        }
+    }
+
     pub fn reserve_canonical(
         &mut self,
         index: &InventoryIndex,
@@ -130,6 +156,46 @@ impl InventoryReservationLedger {
             .reconcile(movement_id, reason, chrono::Utc::now().timestamp())
             .map(movement_to_dto)
     }
+}
+
+fn subtract_reserved_market_depth(
+    orders: &mut Vec<prayer_state::MarketOrder>,
+    mut reserved: i64,
+    highest_price_first: bool,
+) {
+    if reserved <= 0 {
+        return;
+    }
+    let mut indexes = orders
+        .iter()
+        .enumerate()
+        .filter(|(_, order)| {
+            order.quantity > 0
+                && !order
+                    .source
+                    .as_deref()
+                    .is_some_and(|source| source.starts_with("virtual_faction:"))
+        })
+        .map(|(index, _)| index)
+        .collect::<Vec<_>>();
+    indexes.sort_by(|left, right| {
+        let ordering = orders[*left].price_each.cmp(&orders[*right].price_each);
+        if highest_price_first {
+            ordering.reverse()
+        } else {
+            ordering
+        }
+        .then(left.cmp(right))
+    });
+    for index in indexes {
+        if reserved <= 0 {
+            break;
+        }
+        let claimed = reserved.min(orders[index].quantity.max(0));
+        orders[index].quantity = orders[index].quantity.saturating_sub(claimed);
+        reserved = reserved.saturating_sub(claimed);
+    }
+    orders.retain(|order| order.quantity > 0);
 }
 
 fn claim_to_domain(claim: RuntimeInventoryClaimDto) -> prayer_runtime::knowledge::InventoryClaim {
@@ -657,6 +723,9 @@ impl RuntimeService {
         );
         drop(_gate);
         if let Some(movement) = result.movement.as_ref() {
+            let mut knowledge = self.knowledge_state.write();
+            knowledge.knowledge_version = knowledge.knowledge_version.saturating_add(1);
+            drop(knowledge);
             let session = self.get_session(movement.session_id).await?;
             session.lock().await.active_movement_id = Some(movement.movement_id);
         }
@@ -681,6 +750,9 @@ impl RuntimeService {
             .ok_or_else(|| {
                 SdkError::BadRequest(format!("unknown inventory movement '{movement_id}'"))
             })?;
+        let mut knowledge = self.knowledge_state.write();
+        knowledge.knowledge_version = knowledge.knowledge_version.saturating_add(1);
+        drop(knowledge);
         match status {
             RuntimeInventoryMovementStatusDto::Completed => {
                 self.settle_virtual_order_uses(&movement.virtual_order_uses, true);
@@ -1402,5 +1474,102 @@ mod tests {
         ledger
             .transition(movement_id, RuntimeInventoryMovementStatusDto::Released)
             .unwrap();
+    }
+
+    #[test]
+    fn active_market_reservations_reduce_projected_depth_until_terminal() {
+        let actor = actor();
+        let mut knowledge = knowledge();
+        let physical = |price_each, quantity| prayer_state::MarketOrder {
+            price_each,
+            quantity,
+            source: None,
+            my_quantity: None,
+        };
+        knowledge.station_markets.insert(
+            "poi-station".into(),
+            prayer_state::StationMarketData {
+                sell_orders: HashMap::from([("ore".into(), vec![physical(5, 4), physical(6, 6)])]),
+                buy_orders: HashMap::from([(
+                    "ore".into(),
+                    vec![
+                        physical(10, 5),
+                        physical(9, 7),
+                        prayer_state::MarketOrder {
+                            price_each: 11,
+                            quantity: 3,
+                            source: Some("virtual_faction:vf-buy".into()),
+                            my_quantity: None,
+                        },
+                    ],
+                )]),
+                ..Default::default()
+            },
+        );
+        let index =
+            InventoryIndex::project_canonical(&knowledge, &[(Uuid::nil(), 1, actor.clone())]);
+        let request = RuntimeInventoryMovementReserveRequest {
+            session_id: "bot-1".into(),
+            kind: "arbitrage".into(),
+            claims: vec![
+                RuntimeInventoryClaimDto {
+                    lot_id: Some("market|market|poi-station|ore".into()),
+                    source_kind: "market".into(),
+                    owner_id: "market".into(),
+                    location_id: "poi-station".into(),
+                    item_id: "ore".into(),
+                    quantity: 7,
+                },
+                RuntimeInventoryClaimDto {
+                    lot_id: Some("market_bid|market|poi-station|ore".into()),
+                    source_kind: "market_bid".into(),
+                    owner_id: "market".into(),
+                    location_id: "poi-station".into(),
+                    item_id: "ore".into(),
+                    quantity: 12,
+                },
+            ],
+            virtual_order_uses: Vec::new(),
+            context: serde_json::Value::Null,
+        };
+        let mut ledger = InventoryReservationLedger::default();
+        let outcome =
+            ledger.reserve_canonical(&index, &actor, &knowledge.galaxy, Uuid::nil(), request);
+        assert!(outcome.accepted);
+
+        let mut market = MarketData {
+            station_markets: knowledge.station_markets.clone(),
+            ..MarketData::default()
+        };
+        ledger.apply_market_reservations(&mut market);
+        let station = &market.station_markets["poi-station"];
+        assert_eq!(station.sell_orders["ore"].len(), 1);
+        assert_eq!(station.sell_orders["ore"][0].quantity, 3);
+        assert_eq!(station.buy_orders["ore"].len(), 1);
+        assert_eq!(
+            station.buy_orders["ore"][0].source.as_deref(),
+            Some("virtual_faction:vf-buy")
+        );
+        assert_eq!(station.buy_orders["ore"][0].quantity, 3);
+
+        ledger
+            .transition(
+                outcome.movement.unwrap().movement_id,
+                RuntimeInventoryMovementStatusDto::Released,
+            )
+            .unwrap();
+        let mut released = MarketData {
+            station_markets: knowledge.station_markets,
+            ..MarketData::default()
+        };
+        ledger.apply_market_reservations(&mut released);
+        assert_eq!(
+            released.station_markets["poi-station"].sell_orders["ore"][0].quantity,
+            4
+        );
+        assert_eq!(
+            released.station_markets["poi-station"].buy_orders["ore"][0].quantity,
+            5
+        );
     }
 }

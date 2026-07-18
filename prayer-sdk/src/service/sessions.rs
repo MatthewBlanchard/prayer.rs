@@ -284,7 +284,18 @@ impl RuntimeService {
     ) -> prayer_state::StateSnapshot<RuntimeVirtualMarketOrderDto, RuntimeVirtualCraftOrderDto>
     {
         let sessions = self.sessions.read().values().cloned().collect::<Vec<_>>();
-        let world = self.knowledge_state.snapshot();
+        let mut world = self.knowledge_state.snapshot();
+        {
+            let reservations = self.inventory_reservations.lock();
+            if reservations.has_active_market_reservations() {
+                let mut projected_market = prayer_runtime::MarketData {
+                    station_markets: world.station_markets.clone(),
+                    ..prayer_runtime::MarketData::default()
+                };
+                reservations.apply_market_reservations(&mut projected_market);
+                Arc::make_mut(&mut world).station_markets = projected_market.station_markets;
+            }
+        }
         let mut bots = HashMap::new();
         let mut version = 0u64;
         for session in sessions {

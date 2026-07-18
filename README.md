@@ -164,7 +164,7 @@ world-state cache.
 - **TypeScript SDK** — connect browser or Node applications with typed actions,
   PrayerLang runs, and maintained state.
 - **Python SDK** — use the same HTTP workflows from async Python 3.11–3.13
-  applications.
+  applications. This SDK is currently untested.
 - **Rust SDK** — embed the Prayer runtime directly without an HTTP boundary.
 - **HTTP API** — control bots from another process or language.
 
@@ -250,6 +250,8 @@ its compiled JavaScript and declarations are produced in `dist/` by bootstrap.
 Applications connect it to a running Prayer HTTP API.
 
 ## Use the Python SDK
+
+> **Note:** The Python SDK is currently untested.
 
 Install `prayer-sdk-py` into a virtual environment, connect once at application
 startup, and share the returned client:

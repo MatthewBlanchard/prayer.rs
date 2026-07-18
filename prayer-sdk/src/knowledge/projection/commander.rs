@@ -108,11 +108,14 @@ impl RuntimeService {
         {
             let state = live_state
                 .map(|live| {
-                    let world = world_read_state_with_metadata(
+                    let mut world = world_read_state_with_metadata(
                         &knowledge,
                         &self.knowledge_metadata.read(),
                         &live,
                     );
+                    self.inventory_reservations
+                        .lock()
+                        .apply_market_reservations(Arc::make_mut(&mut world.market));
                     map_commander_session_state(&live, &world)
                 })
                 .transpose()?;
@@ -231,11 +234,14 @@ impl RuntimeService {
                         .saturating_add(session_probe_started.elapsed().as_millis());
                 }
                 let compose_started = Instant::now();
-                let world_read = world_read_state_with_metadata(
+                let mut world_read = world_read_state_with_metadata(
                     &knowledge,
                     &self.knowledge_metadata.read(),
                     &session.actor.observed,
                 );
+                self.inventory_reservations
+                    .lock()
+                    .apply_market_reservations(Arc::make_mut(&mut world_read.market));
                 compose_state_ms =
                     compose_state_ms.saturating_add(compose_started.elapsed().as_millis());
                 projected_waiting_total = projected_waiting_total

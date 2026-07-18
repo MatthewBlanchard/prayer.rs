@@ -131,9 +131,21 @@ impl InventoryReservationLedger {
         item_id: &str,
     ) -> i64 {
         let suffix = format!("|{owner_id}|{location_id}|{item_id}");
+        let compound = format!("{source_kind}{suffix}");
         self.reserved_by_key
             .iter()
-            .filter(|(key, _)| *key == &format!("{source_kind}{suffix}") || key.ends_with(&suffix))
+            .filter(|(key, _)| {
+                *key == &compound
+                    || (key.ends_with(&suffix)
+                        && match source_kind {
+                            "market" => key.starts_with("ask:"),
+                            "market_bid" => key.starts_with("bid|"),
+                            "passenger" => key.starts_with("passenger|"),
+                            "personal_storage" => key.starts_with("personal|"),
+                            "faction_storage" => key.starts_with("faction|"),
+                            _ => false,
+                        })
+            })
             .map(|(_, quantity)| *quantity)
             .sum()
     }
