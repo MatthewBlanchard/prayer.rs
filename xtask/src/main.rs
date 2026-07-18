@@ -93,7 +93,7 @@ fn main() -> Result<()> {
 }
 
 fn prerequisites() -> Result<()> {
-    for tool in ["cargo", "node", "npm"] {
+    for tool in ["cargo", "node", "npm", "python3"] {
         let status = Command::new(tool)
             .arg("--version")
             .status()
@@ -201,14 +201,33 @@ fn generate(root: &Path) -> Result<()> {
                 .unwrap(),
         ],
     )?;
-    run_in(root.join("prayer-sdk-ts"), "npm", &["run", "generate"])
+    run_in(root.join("prayer-sdk-ts"), "npm", &["run", "generate"])?;
+    run_in(
+        root.join("prayer-sdk-py"),
+        "python3",
+        &["scripts/generate.py"],
+    )
 }
 
-fn generated(root: &Path) -> [PathBuf; 3] {
-    [
-        root.join("prayer-api/openapi/prayer-v1.json"),
-        root.join("prayer-sdk-ts/src/generated/types.ts"),
-        root.join("prayer-sdk-ts/src/generated/api.ts"),
+fn generated(root: &Path) -> Vec<(PathBuf, &'static str)> {
+    vec![
+        (
+            root.join("prayer-api/openapi/prayer-v1.json"),
+            "prayer-v1.json",
+        ),
+        (
+            root.join("prayer-sdk-ts/src/generated/types.ts"),
+            "types.ts",
+        ),
+        (root.join("prayer-sdk-ts/src/generated/api.ts"), "api.ts"),
+        (
+            root.join("prayer-sdk-py/src/prayer_sdk/generated/models.py"),
+            "models.py",
+        ),
+        (
+            root.join("prayer-sdk-py/src/prayer_sdk/generated/api.py"),
+            "python-api.py",
+        ),
     ]
 }
 
@@ -222,12 +241,8 @@ fn check(root: &Path) -> Result<()> {
     fs::create_dir_all(&temp)?;
     generate_to(root, &temp)?;
     let mut stale = Vec::new();
-    for (path, generated_name) in
-        generated(root)
-            .iter()
-            .zip(["prayer-v1.json", "types.ts", "api.ts"])
-    {
-        let actual = fs::read(path).with_context(|| {
+    for (path, generated_name) in generated(root) {
+        let actual = fs::read(&path).with_context(|| {
             format!(
                 "missing generated artifact {}; run `cargo xtask generate`",
                 path.display()
@@ -253,6 +268,8 @@ fn generate_to(root: &Path, destination: &Path) -> Result<()> {
     let openapi = destination.join("prayer-v1.json");
     let types = destination.join("types.ts");
     let api = destination.join("api.ts");
+    let python_models = destination.join("models.py");
+    let python_api = destination.join("python-api.py");
     run(
         "cargo",
         &[
@@ -282,7 +299,24 @@ fn generate_to(root: &Path, destination: &Path) -> Result<()> {
             openapi.to_str().unwrap(),
             api.to_str().unwrap(),
         ],
-    )
+    )?;
+    run_in(
+        root.join("prayer-sdk-py"),
+        "python3",
+        &[
+            "scripts/generate.py",
+            openapi.to_str().unwrap(),
+            destination.to_str().unwrap(),
+        ],
+    )?;
+    fs::rename(destination.join("api.py"), python_api)?;
+    if !python_models.exists() {
+        bail!(
+            "Python model generation did not produce {}",
+            python_models.display()
+        );
+    }
+    Ok(())
 }
 
 fn build(root: &Path, spacemolt_base_url: &str, offline: bool) -> Result<()> {
@@ -312,6 +346,16 @@ fn compile_and_test(root: &Path) -> Result<()> {
     run_in(root.join("prayer-sdk-ts"), "npm", &["run", "check"])?;
     run_in(root.join("prayer-sdk-ts"), "npm", &["test"])?;
     run_in(root.join("prayer-sdk-ts"), "npm", &["run", "test:package"])?;
+    run_in(
+        root.join("prayer-sdk-py"),
+        "python3",
+        &["scripts/check_generated.py"],
+    )?;
+    run_in(
+        root.join("prayer-sdk-py"),
+        "python3",
+        &["-m", "pytest", "-q"],
+    )?;
     run_in(root.join("reference-client-ts"), "npm", &["run", "build"])?;
     run_in(root.join("reference-client-ts"), "npm", &["test"])
 }

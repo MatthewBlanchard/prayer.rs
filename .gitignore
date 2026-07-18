@@ -27,6 +27,8 @@
 # Python
 __pycache__/
 *.pyc
+/prayer-sdk-py/dist/
+/prayer-sdk-py/.pytest_cache/
 
 # Environment files
 .env

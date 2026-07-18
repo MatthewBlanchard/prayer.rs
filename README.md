@@ -163,11 +163,13 @@ world-state cache.
 
 - **TypeScript SDK** — connect browser or Node applications with typed actions,
   PrayerLang runs, and maintained state.
+- **Python SDK** — use the same HTTP workflows from async Python 3.11–3.13
+  applications.
 - **Rust SDK** — embed the Prayer runtime directly without an HTTP boundary.
 - **HTTP API** — control bots from another process or language.
 
-The Rust SDK is the embedded runtime interface. The TypeScript SDK is the typed
-client for the HTTP API.
+The Rust SDK is the embedded runtime interface. The TypeScript and Python SDKs
+are typed clients for the HTTP API.
 
 The included **control room** is a reference consumer of these interfaces. It
 demonstrates how to operate sessions and jobs and build a complete web UI on the
@@ -179,8 +181,8 @@ Prayer supports Rust 1.78 or newer and Node.js 22 or newer with npm 10 or 11. In
 Xcode Command Line Tools on macOS; a C compiler, linker, `pkg-config`, and
 TLS/build packages on Linux; or the Rust MSVC toolchain and Visual Studio C++
 Build Tools on native Windows. WSL is an optional fallback, not a requirement.
-Python 3, `curl`, and `jq` are maintenance conveniences and are not needed to
-build or run Prayer.
+Python 3.11–3.13 is required to develop the Python SDK. `curl` and `jq` are
+maintenance conveniences and are not needed to build or run Prayer.
 
 From a fresh clone, install locked JavaScript dependencies and build the local
 TypeScript SDK before anything consumes it:
@@ -246,6 +248,24 @@ After `cargo xtask bootstrap`, import `@prayer/sdk` from
 `prayer-sdk-ts`. It is a source-distributed local package during development;
 its compiled JavaScript and declarations are produced in `dist/` by bootstrap.
 Applications connect it to a running Prayer HTTP API.
+
+## Use the Python SDK
+
+Install `prayer-sdk-py` into a virtual environment, connect once at application
+startup, and share the returned client:
+
+```python
+from prayer_sdk import Prayer
+from prayer_sdk.actions import dock, go
+
+prayer = await Prayer.connect("http://127.0.0.1:7777", token="...")
+bot = await prayer.bot("my-miner")
+result = await bot.execute([go(poi="sol_central"), dock()])
+await prayer.aclose()
+```
+
+See [`prayer-sdk-py/README.md`](prayer-sdk-py/README.md) for generated API,
+error, idempotency, and reattachment details.
 
 ## Run the complete local control room
 

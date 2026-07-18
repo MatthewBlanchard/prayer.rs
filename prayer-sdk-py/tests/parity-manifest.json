@@ -1,0 +1,28 @@
+{
+  "source": "prayer-sdk-ts/test",
+  "entries": [
+    {"typescript": "connect negotiates v1 and constructors emit exact wire actions", "python": "test_connect_negotiates_and_actions_have_exact_wire_shape", "status": "implemented"},
+    {"typescript": "route and routes use the authoritative bulk routing endpoint", "python": "test_routes_use_bulk_endpoint_and_safe_default", "status": "implemented"},
+    {"typescript": "state conditionally refreshes and retains unchanged cached domains", "python": "test_state_cache", "status": "implemented"},
+    {"typescript": "state applies keyed market deltas with structural sharing", "python": "test_state_cache", "status": "implemented"},
+    {"typescript": "state recovers from a mismatched market delta with a full snapshot", "python": "test_state_cache", "status": "implemented"},
+    {"typescript": "consumer mutation cannot corrupt the internal state cache", "python": "test_state_cache", "status": "implemented"},
+    {"typescript": "complete action helper catalog emits canonical wire actions", "python": "test_connect_negotiates_and_actions_have_exact_wire_shape", "status": "implemented"},
+    {"typescript": "connect rejects an incompatible API major", "python": "test_incompatible_major_closes_owned_client", "status": "implemented"},
+    {"typescript": "transport maps lane_busy into the specialized structured error", "python": "test_structured_error_and_headers", "status": "implemented"},
+    {"typescript": "transport adds bearer authentication and caller headers", "python": "test_structured_error_and_headers", "status": "implemented"},
+    {"typescript": "network failures become PrayerConnectionError", "python": "test_timeout_connection_and_cancellation_are_distinct", "status": "implemented"},
+    {"typescript": "default browser fetch is invoked with the global receiver", "python": "test_connect_negotiates_and_actions_have_exact_wire_shape", "status": "language-specific: injected client ownership"},
+    {"typescript": "request timeout aborts an unresponsive fetch", "python": "test_timeout_connection_and_cancellation_are_distinct", "status": "implemented"},
+    {"typescript": "caller abort remains distinct from timeout and transport failure", "python": "test_timeout_connection_and_cancellation_are_distinct", "status": "implemented"},
+    {"typescript": "high-level starts generate, validate, preserve, and expose idempotency keys", "python": "test_runs_idempotency_polling_and_explicit_cancel", "status": "implemented"},
+    {"typescript": "run wait polls without cancelling and explicit cancel is separate", "python": "test_runs_idempotency_polling_and_explicit_cancel", "status": "implemented"},
+    {"typescript": "execute waits for the action run and returns its terminal response", "python": "test_runs_idempotency_polling_and_explicit_cancel", "status": "implemented"},
+    {"typescript": "action submission sends idempotency key and exact action body", "python": "test_runs_idempotency_polling_and_explicit_cancel", "status": "implemented"},
+    {"typescript": "script submission, status, and cancellation use script resources", "python": "test_runs_idempotency_polling_and_explicit_cancel", "status": "implemented"},
+    {"typescript": "existing action and script runs can be recovered as high-level handles", "python": "test_runs_idempotency_polling_and_explicit_cancel", "status": "implemented"},
+    {"typescript": "run polling removes abort listeners after each completed delay", "python": "test_runs_idempotency_polling_and_explicit_cancel", "status": "language-specific: asyncio sleep cleanup"},
+    {"typescript": "aborting a local wait never sends server cancellation", "python": "test_timeout_connection_and_cancellation_are_distinct", "status": "implemented"},
+    {"typescript": "credentialed bounded-resource live test", "python": "tests/live", "status": "opt-in"}
+  ]
+}
