@@ -1263,7 +1263,27 @@ impl Account {
                         );
                     }
                     other => {
-                        if other.is_ok() {
+                        if let Ok(result) = &other {
+                            if result.auto_docked || result.auto_undocked {
+                                if let Err(error) =
+                                    account.refresh_sections(&[StateSection::Location]).await
+                                {
+                                    account
+                                        .inner
+                                        .lock()
+                                        .expect("account")
+                                        .cache
+                                        .mark_dirty(StateSection::Location);
+                                    warn!(
+                                        tool,
+                                        action,
+                                        auto_docked = result.auto_docked,
+                                        auto_undocked = result.auto_undocked,
+                                        error = %error,
+                                        "post-transition location refresh failed; mutation remains successful"
+                                    );
+                                }
+                            }
                             if let Some(policy) = reconciliation_policy(&tool, &action) {
                                 if let Err(error) = account.refresh_sections(policy.sections).await
                                 {

@@ -141,6 +141,66 @@ async fn mutation_fires_ack_applies_delta_before_resolving() {
 }
 
 #[tokio::test]
+async fn automatic_dock_transition_refreshes_authoritative_location() {
+    let (account, socket) = connected().await;
+
+    let pending = account.mutate(
+        "spacemolt",
+        "repair_module",
+        Some(json!({ "id": "module_1" })),
+    );
+    let mutation_id = socket.last_request_id();
+    socket.server_send(RawFrame {
+        kind: "result".to_string(),
+        request_id: Some(mutation_id.clone()),
+        payload: Some(json!({
+            "result": "pending",
+            "structuredContent": {
+                "pending": true,
+                "command": "repair_module",
+                "message": "queued"
+            }
+        })),
+    });
+    socket.server_send(RawFrame {
+        kind: "action_result".to_string(),
+        request_id: Some(mutation_id),
+        payload: Some(json!({
+            "command": "repair_module",
+            "tick": 1524,
+            "auto_docked": true,
+            "result": { "details": { "repaired": true } }
+        })),
+    });
+
+    let task = tokio::spawn(pending);
+    wait_for_sent_len(&socket, 2).await;
+    let sent = socket.sent();
+    assert_eq!(sent[1].tool, "spacemolt");
+    assert_eq!(sent[1].action, "get_location");
+    let location_request_id = sent[1].request_id.clone().expect("request id");
+    socket.server_send(RawFrame {
+        kind: "result".to_string(),
+        request_id: Some(location_request_id),
+        payload: Some(json!({
+            "result": "location",
+            "structuredContent": {
+                "system_id": "sol",
+                "poi_id": "earth_station",
+                "docked_at": "earth_station"
+            }
+        })),
+    });
+
+    let result = task.await.expect("mutation task").expect("mutation");
+    assert!(result.auto_docked);
+    assert_eq!(
+        account.state_snapshot()["location"]["docked_at"],
+        json!("earth_station")
+    );
+}
+
+#[tokio::test]
 async fn state_change_listeners_receive_action_result_sections_with_isolation() {
     let (account, socket) = connected().await;
     let seen = Arc::new(Mutex::new(Vec::new()));
