@@ -4,6 +4,25 @@ use super::*;
 
 impl RuntimeService {
     pub fn start_idle_session_refresher(self: Arc<Self>) {
+        let market_service = Arc::clone(&self);
+        self.spawn_background(async move {
+            let Some(mut market_rx) = market_service.market_update_rx.lock().take() else {
+                warn!("market update batcher already started");
+                return;
+            };
+            while let Some(first) = market_rx.recv().await {
+                let mut dirty = HashSet::from([first]);
+                tokio::time::sleep(MARKET_UPDATE_BATCH_WINDOW).await;
+                while let Ok(id) = market_rx.try_recv() {
+                    dirty.insert(id);
+                }
+                market_service.flush_market_update_batch(dirty).await;
+                if market_service.is_shutting_down() {
+                    break;
+                }
+            }
+        });
+
         let service = Arc::clone(&self);
         self.spawn_background(async move {
             let mut interval = tokio::time::interval(IDLE_SESSION_REFRESH_INTERVAL);
@@ -34,6 +53,55 @@ impl RuntimeService {
                 }
             }
         });
+    }
+
+    async fn flush_market_update_batch(&self, dirty: HashSet<Uuid>) {
+        let mut updates = HashMap::new();
+        for id in dirty {
+            let Ok(session) = self.get_session(id).await else {
+                continue;
+            };
+            let account = session.lock().await.spacemolt_account.clone();
+            let Some(account) = account else { continue };
+            let mut projected =
+                crate::spacemolt_projection::project_account_state(&account.state());
+            let Some(base_id) = projected.market_base_id.clone() else {
+                continue;
+            };
+            let Some(book) = account.market(&base_id) else {
+                continue;
+            };
+            crate::spacemolt_projection::project_market_book_from_client(&mut projected, &book);
+            updates.extend(projected.world.market.station_markets.clone());
+        }
+        if updates.is_empty() {
+            return;
+        }
+
+        let changed = {
+            let mut knowledge = self.knowledge_state.write();
+            let mut changed = false;
+            for (station_id, snapshot) in updates {
+                if !knowledge
+                    .station_markets
+                    .get(&station_id)
+                    .is_some_and(|known| {
+                        prayer_runtime::knowledge::station_market_snapshot_eq(known, &snapshot)
+                    })
+                {
+                    knowledge.station_markets.insert(station_id, snapshot);
+                    changed = true;
+                }
+            }
+            if changed {
+                knowledge.knowledge_version = knowledge.knowledge_version.saturating_add(1);
+            }
+            changed
+        };
+        if changed {
+            self.knowledge_persistence
+                .publish_shared(self.knowledge_state.snapshot(), "market update batch");
+        }
     }
 
     pub async fn refresh_idle_sessions_once(self: &Arc<Self>) {

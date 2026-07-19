@@ -74,6 +74,7 @@ const SESSION_SCHEMA_VERSION: u32 = 3;
 const FILE_LOCK_TIMEOUT_MS: u64 = 2_000;
 const FILE_LOCK_STALE_SECS: u64 = 120;
 const IDLE_SESSION_REFRESH_INTERVAL: Duration = Duration::from_secs(10);
+const MARKET_UPDATE_BATCH_WINDOW: Duration = Duration::from_secs(2);
 const MOBILE_BASE_POI_ID: &str = "mobile_capital";
 const MOBILE_BASE_STATION_ID: &str = "frontier_station";
 const LEGACY_MOBILE_BASE_STATION_ID: &str = "mobile_base";
@@ -615,6 +616,8 @@ pub struct RuntimeService {
     persistence_telemetry: Arc<PersistenceTelemetry>,
     account_state_tx: tokio::sync::mpsc::UnboundedSender<Uuid>,
     account_state_rx: ParkingMutex<Option<tokio::sync::mpsc::UnboundedReceiver<Uuid>>>,
+    market_update_tx: tokio::sync::mpsc::UnboundedSender<Uuid>,
+    market_update_rx: ParkingMutex<Option<tokio::sync::mpsc::UnboundedReceiver<Uuid>>>,
 }
 
 impl Default for RuntimeService {
@@ -662,6 +665,7 @@ impl RuntimeService {
         );
         let session_state_path = options.session_state_path.clone();
         let (account_state_tx, account_state_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (market_update_tx, market_update_rx) = tokio::sync::mpsc::unbounded_channel();
         Self {
             options,
             shutting_down: AtomicBool::new(false),
@@ -695,6 +699,8 @@ impl RuntimeService {
             persistence_telemetry,
             account_state_tx,
             account_state_rx: ParkingMutex::new(Some(account_state_rx)),
+            market_update_tx,
+            market_update_rx: ParkingMutex::new(Some(market_update_rx)),
         }
     }
 }

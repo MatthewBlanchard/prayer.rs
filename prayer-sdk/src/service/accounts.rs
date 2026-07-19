@@ -8,6 +8,10 @@ impl RuntimeService {
         account.on_state_change(move |_| {
             let _ = state_tx.send(id);
         });
+        let market_tx = self.market_update_tx.clone();
+        account.on("market_update", move |_| {
+            let _ = market_tx.send(id);
+        });
         let reconnect_tx = self.account_state_tx.clone();
         account.on_reconnected(move || {
             let _ = reconnect_tx.send(id);
