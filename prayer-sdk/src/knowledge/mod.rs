@@ -184,13 +184,13 @@ pub fn unload_all_no_passengers_error(
     if !tool.eq_ignore_ascii_case("spacemolt") || !action.eq_ignore_ascii_case("unload_passenger") {
         return false;
     }
-    let Some(name) = payload
-        .and_then(|payload| payload.get("name"))
+    let Some(id) = payload
+        .and_then(|payload| payload.get("id"))
         .and_then(Value::as_str)
     else {
         return false;
     };
-    name.eq_ignore_ascii_case("all") && error.server_code() == Some("no_passengers")
+    id.eq_ignore_ascii_case("all") && error.server_code() == Some("no_passengers")
 }
 
 pub fn garage_related_passthrough_action(

@@ -1626,7 +1626,9 @@ fn unload_all_no_passengers_error_matches_exact_api_rejection() {
             "You have no passengers aboard to unload.",
         ),
     ));
-    let payload = serde_json::json!({ "name": "all" });
+    // Runtime lowering uses the upstream API's `id` field for the command's
+    // passenger name (including the special `all` value).
+    let payload = serde_json::json!({ "id": "all" });
 
     assert!(unload_all_no_passengers_error(
         "spacemolt",
@@ -1635,7 +1637,7 @@ fn unload_all_no_passengers_error_matches_exact_api_rejection() {
         &error
     ));
 
-    let named_payload = serde_json::json!({ "name": "Ada" });
+    let named_payload = serde_json::json!({ "id": "Ada" });
     assert!(!unload_all_no_passengers_error(
         "spacemolt",
         "unload_passenger",
