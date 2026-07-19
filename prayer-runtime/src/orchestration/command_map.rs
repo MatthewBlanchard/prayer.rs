@@ -4,9 +4,30 @@ use spacemolt_lib_rs::actions::{find_action, ActionDef};
 
 use crate::operation_failure::OperationFailure;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DockingRequirement {
+    None,
+    DockableBase,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ResolvedCommandDef {
+    pub definition: &'static ActionDef,
+    pub docking: DockingRequirement,
+}
+
+impl std::ops::Deref for ResolvedCommandDef {
+    type Target = ActionDef;
+
+    fn deref(&self) -> &Self::Target {
+        self.definition
+    }
+}
+
 /// Resolve the small set of Prayer DSL naming conventions into the generated
-/// SpaceMolt action catalog. The catalog remains the source of request fields.
-pub(crate) fn resolve_command(action: &str) -> Result<&'static ActionDef, OperationFailure> {
+/// SpaceMolt action catalog and attach Prayer's execution policy. The generated
+/// catalog remains the source of request fields.
+pub(crate) fn resolve_command(action: &str) -> Result<ResolvedCommandDef, OperationFailure> {
     let normalized = action.to_ascii_lowercase();
     if matches!(
         normalized.as_str(),
@@ -77,7 +98,40 @@ pub(crate) fn resolve_command(action: &str) -> Result<&'static ActionDef, Operat
         value => format!("spacemolt/{value}"),
     };
 
-    find_action(&key).ok_or_else(|| OperationFailure::InvalidIntent(action.to_string()))
+    let definition =
+        find_action(&key).ok_or_else(|| OperationFailure::InvalidIntent(action.to_string()))?;
+    Ok(ResolvedCommandDef {
+        definition,
+        docking: docking_requirement(definition.key),
+    })
+}
+
+fn docking_requirement(key: &str) -> DockingRequirement {
+    match key {
+        "spacemolt/accept_mission"
+        | "spacemolt/decline_mission"
+        | "spacemolt/repair_module"
+        | "spacemolt/recycle"
+        | "spacemolt/load_passenger"
+        | "spacemolt/unload_passenger"
+        | "spacemolt/craft"
+        | "spacemolt_facility/build"
+        | "spacemolt_facility/faction_build"
+        | "spacemolt_facility/upgrade"
+        | "spacemolt_facility/faction_upgrade"
+        | "spacemolt_facility/dismantle"
+        | "spacemolt_facility/faction_dismantle"
+        | "spacemolt_facility/set_access"
+        | "spacemolt_facility/set_output_price"
+        | "spacemolt_facility/set_name"
+        | "spacemolt_ship/buy_listed_ship"
+        | "spacemolt_ship/switch_ship"
+        | "spacemolt_ship/commission_ship"
+        | "spacemolt_ship/list_ship_for_sale"
+        | "spacemolt_market/cancel_order"
+        | "spacemolt_market/modify_order" => DockingRequirement::DockableBase,
+        _ => DockingRequirement::None,
+    }
 }
 
 pub(crate) fn args_to_generated_payload(
@@ -215,6 +269,18 @@ fn command_arg_to_json(arg: &ActionArg) -> Value {
 #[cfg(test)]
 mod coverage_tests {
     use super::*;
+
+    #[test]
+    fn docking_policy_is_attached_after_alias_resolution() {
+        let alias = resolve_command("buy_ship").expect("buy_ship");
+        let canonical = resolve_command("buy_listed_ship").expect("buy_listed_ship");
+        assert_eq!(alias.definition.key, canonical.definition.key);
+        assert_eq!(alias.docking, DockingRequirement::DockableBase);
+        assert_eq!(canonical.docking, DockingRequirement::DockableBase);
+
+        let survey = resolve_command("survey").expect("survey");
+        assert_eq!(survey.docking, DockingRequirement::None);
+    }
 
     #[test]
     fn added_command_surfaces_resolve_to_generated_mutations() {

@@ -143,8 +143,10 @@ fn unload_passenger_all_completes_when_manifest_observed_empty() {
 fn unload_passenger_all_still_calls_api_when_manifest_unknown() {
     let mut p = planner("unload_passenger", vec![ActionArg::Any("all".to_string())]);
 
-    let (action, payload) =
-        expect_api_call(p.next(&PlanningState::default(), None).expect("start"));
+    let (action, payload) = expect_api_call(
+        p.next(&docked_state("sol", "station_1"), None)
+            .expect("start"),
+    );
 
     assert_eq!(action, "spacemolt/unload_passenger");
     assert_eq!(payload, Some(serde_json::json!({ "id": "all" })));
@@ -594,7 +596,7 @@ fn faction_facility_build_maps_to_facility_api() {
     let mut planner = CommandPlanner::new(command.clone(), None, HashSet::new());
     let (action, payload) = expect_api_call(
         planner
-            .next(&PlanningState::default(), None)
+            .next(&docked_state("sol", "station_1"), None)
             .expect("plan facility build"),
     );
     assert_eq!(action, "spacemolt_facility/faction_build");
@@ -620,7 +622,7 @@ fn facility_upgrade_maps_ids_and_type_to_facility_api() {
     let mut planner = CommandPlanner::new(command, None, HashSet::new());
     let (action, payload) = expect_api_call(
         planner
-            .next(&PlanningState::default(), None)
+            .next(&docked_state("sol", "station_1"), None)
             .expect("plan facility upgrade"),
     );
     let payload = payload.expect("payload");
@@ -631,6 +633,7 @@ fn facility_upgrade_maps_ids_and_type_to_facility_api() {
 
 #[test]
 fn facility_config_commands_map_to_facility_api() {
+    let state = docked_state("sol", "station_1");
     let mut engine = crate::engine::RuntimeEngine::default();
     engine
             .set_script(
@@ -644,11 +647,7 @@ fn facility_config_commands_map_to_facility_api() {
         .expect("decide")
         .expect("command");
     let mut planner = CommandPlanner::new(command.clone(), None, HashSet::new());
-    let (action, payload) = expect_api_call(
-        planner
-            .next(&PlanningState::default(), None)
-            .expect("plan set access"),
-    );
+    let (action, payload) = expect_api_call(planner.next(&state, None).expect("plan set access"));
     let payload = payload.expect("payload");
     assert_eq!(action, "spacemolt_facility/set_access");
     assert_eq!(payload["facility_id"], "facility 12");
@@ -664,11 +663,8 @@ fn facility_config_commands_map_to_facility_api() {
         .expect("decide")
         .expect("command");
     let mut planner = CommandPlanner::new(command.clone(), None, HashSet::new());
-    let (action, payload) = expect_api_call(
-        planner
-            .next(&PlanningState::default(), None)
-            .expect("plan set output price"),
-    );
+    let (action, payload) =
+        expect_api_call(planner.next(&state, None).expect("plan set output price"));
     let payload = payload.expect("payload");
     assert_eq!(action, "spacemolt_facility/set_output_price");
     assert_eq!(payload["facility_id"], "facility 12");
@@ -685,11 +681,7 @@ fn facility_config_commands_map_to_facility_api() {
         .expect("decide")
         .expect("command");
     let mut planner = CommandPlanner::new(command, None, HashSet::new());
-    let (action, payload) = expect_api_call(
-        planner
-            .next(&PlanningState::default(), None)
-            .expect("plan set name"),
-    );
+    let (action, payload) = expect_api_call(planner.next(&state, None).expect("plan set name"));
     let payload = payload.expect("payload");
     assert_eq!(action, "spacemolt_facility/set_name");
     assert_eq!(payload["facility_id"], "facility 12");
@@ -3132,6 +3124,43 @@ fn market_command_undocked_positions_first() {
     let mut p = planner("buy", vec![ActionArg::ItemId("iron".to_string())]);
     let (action, _) = expect_api_call(p.next(&state, None).expect("plan"));
     assert_eq!(action, "spacemolt/dock");
+}
+
+#[test]
+fn dock_required_passthrough_commands_dock_before_dispatch() {
+    let mut state = docked_state("sol", "station_1");
+    state.docked = false;
+
+    for action in [
+        "accept_mission",
+        "decline_mission",
+        "repair_module",
+        "recycle",
+        "load_passenger",
+        "unload_passenger",
+        "craft",
+        "facility_build",
+        "faction_facility_build",
+        "facility_upgrade",
+        "faction_facility_upgrade",
+        "buy_ship",
+        "buy_listed_ship",
+        "switch_ship",
+        "commission_ship",
+        "list_ship_for_sale",
+        "cancel_order",
+        "modify_order",
+        "facility_dismantle",
+        "faction_facility_dismantle",
+        "facility_set_access",
+        "facility_set_output_price",
+        "facility_set_name",
+    ] {
+        let mut planner = planner(action, vec![]);
+        let (lowered, payload) = expect_api_call(planner.next(&state, None).expect(action));
+        assert_eq!(lowered, "spacemolt/dock", "{action}");
+        assert_eq!(payload, None, "{action}");
+    }
 }
 
 #[test]

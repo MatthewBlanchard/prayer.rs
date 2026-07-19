@@ -38,7 +38,9 @@ use crate::read_context::PlanningState;
 use crate::read_context::RuntimeReadContext;
 use tracing::debug;
 
-use self::command_map::{args_to_generated_payload, craft_args_to_payload, resolve_command};
+use self::command_map::{
+    args_to_generated_payload, craft_args_to_payload, resolve_command, DockingRequirement,
+};
 use self::context::Phase;
 use self::responses::{
     complete, completed_with_api_message, completed_with_message, error_code,
@@ -229,7 +231,7 @@ impl CommandPlanner {
             "wait" => Ok(self.start_wait()),
             "go" => self.start_go(state),
             "refuel" if self.command.args.is_empty() => self.start_refuel(state),
-            "refuel" => self.start_passthrough(),
+            "refuel" => self.start_passthrough(state),
             "find" => self.start_find(state),
             "mine" => self.start_mine(state),
             "transfer" => self.start_transfer(state),
@@ -249,7 +251,7 @@ impl CommandPlanner {
             "attack" => self.start_attack(),
             "scan" => Ok(self.start_scan()),
             "unload_passenger" => self.start_unload_passenger(state),
-            _ => self.start_passthrough(),
+            _ => self.start_passthrough(state),
         }
     }
 

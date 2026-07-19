@@ -7,17 +7,33 @@ impl CommandPlanner {
         &mut self,
         state: &PlanningState,
     ) -> Result<RuntimeOperation, OperationFailure> {
-        let name = required_text_arg(&self.command, 0, "unload_passenger")?;
-        if name.eq_ignore_ascii_case("all") && passenger_manifest_observed_empty(state) {
+        let unload_all = self
+            .command
+            .args
+            .first()
+            .is_some_and(|arg| arg.as_text().eq_ignore_ascii_case("all"));
+        if unload_all && passenger_manifest_observed_empty(state) {
             return Ok(complete(completed_with_message(
                 "No passengers aboard; unload_passenger all already complete.",
             )));
         }
-        self.start_passthrough()
+        if let Some(operation) = self.ensure_docked_step(state, false) {
+            return Ok(operation);
+        }
+        required_text_arg(&self.command, 0, "unload_passenger")?;
+        self.start_passthrough(state)
     }
 
-    pub(super) fn start_passthrough(&mut self) -> Result<RuntimeOperation, OperationFailure> {
+    pub(super) fn start_passthrough(
+        &mut self,
+        state: &PlanningState,
+    ) -> Result<RuntimeOperation, OperationFailure> {
         let spec = resolve_command(&self.command.action)?;
+        if spec.docking == DockingRequirement::DockableBase {
+            if let Some(operation) = self.ensure_docked_step(state, false) {
+                return Ok(operation);
+            }
+        }
         if self.command.action.eq_ignore_ascii_case("scrap_ship") && self.command.args.is_empty() {
             return Err(OperationFailure::InvalidIntent(
                 "scrap_ship requires a ship id".to_string(),
@@ -39,7 +55,7 @@ impl CommandPlanner {
         } else if self.command.action.eq_ignore_ascii_case("trade_offer") {
             trade_offer_payload(&self.command.args)?
         } else {
-            args_to_generated_payload(&self.command.action, &self.command.args, spec)?
+            args_to_generated_payload(&self.command.action, &self.command.args, spec.definition)?
         };
         self.phase = Phase::AwaitFinalCall;
         Ok(RuntimeOperation::SpaceMoltAction {

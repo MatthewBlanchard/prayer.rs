@@ -162,7 +162,7 @@ mod tests {
         let payload = args_to_generated_payload(
             "accept_mission",
             &[ActionArg::MissionId("m_1".to_string())],
-            action,
+            action.definition,
         )
         .expect("payload");
         let map = object_map(&payload);
@@ -181,7 +181,7 @@ mod tests {
                 ActionArg::ShipId("ship_1".to_string()),
                 ActionArg::Integer(1200),
             ],
-            action,
+            action.definition,
         )
         .expect("payload");
         let map = object_map(&payload);
@@ -265,7 +265,7 @@ mod tests {
         let load_payload = args_to_generated_payload(
             "load_passenger",
             &[ActionArg::PoiId("sol_central".to_string())],
-            load,
+            load.definition,
         )
         .expect("load payload");
         assert_eq!(
@@ -278,7 +278,7 @@ mod tests {
         let unload_payload = args_to_generated_payload(
             "unload_passenger",
             &[ActionArg::Any("all".to_string())],
-            unload,
+            unload.definition,
         )
         .expect("unload payload");
         assert_eq!(
