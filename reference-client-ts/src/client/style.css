@@ -861,6 +861,59 @@ body,
   flex-shrink: 0;
 }
 
+.galaxy-map-resource-filter {
+  position: relative;
+  margin-right: 4px;
+}
+
+.galaxy-map-controls .galaxy-map-resource-toggle {
+  min-width: 86px;
+}
+
+.galaxy-map-controls .galaxy-map-resource-toggle--active {
+  color: var(--yellow);
+  border-color: var(--yellow);
+}
+
+.galaxy-map-resource-menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 7px);
+  right: 0;
+  width: 240px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-surface);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 45%);
+}
+
+.galaxy-map-resource-menu label {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--text-faint);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.galaxy-map-resource-menu select {
+  width: 100%;
+  height: 28px;
+  padding: 3px 7px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 11px;
+  outline: none;
+}
+
+.galaxy-map-resource-menu select:focus {
+  border-color: var(--yellow);
+}
+
 .galaxy-map-search {
   width: 190px;
   height: 24px;

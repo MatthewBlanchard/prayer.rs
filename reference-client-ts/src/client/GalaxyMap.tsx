@@ -27,6 +27,7 @@ export type GalaxyMapViewportProps = GalaxyMapProps & {
   selectablePoiIds?: string[];
   onSystemClick?: (systemId: string) => void;
   onSelectSystem?: (systemId: string) => void;
+  resourceFilters?: Array<{ id: string; label: string; systemIds: string[] }>;
 };
 
 type PositionedSystem = GalaxyMapSystem & {
@@ -287,6 +288,7 @@ function GalaxyMapViewportComponent({
   selectablePoiIds,
   onSystemClick,
   onSelectSystem,
+  resourceFilters = [],
 }: GalaxyMapViewportProps) {
   const embedded = variant === "embedded";
   const threeCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -325,6 +327,8 @@ function GalaxyMapViewportComponent({
   const pendingMapDataRef = useRef<typeof incomingMapData>();
   const exploration = useStableSnapshot(explorationSnapshot);
   const [searchQuery, setSearchQuery] = useState("");
+  const [resourceFilterOpen, setResourceFilterOpen] = useState(false);
+  const [selectedResourceId, setSelectedResourceId] = useState("");
   const [selectedRouteHops, setSelectedRouteHops] = useState<Map<string, string[]>>(new Map());
   const highlightedSystemsKey = [...highlightedSystemIds].sort().join("|");
   const highlightedSystems = useMemo(() => new Set(highlightedSystemsKey ? highlightedSystemsKey.split("|") : []), [highlightedSystemsKey]);
@@ -373,6 +377,13 @@ function GalaxyMapViewportComponent({
     [mapData],
   );
   const normalizedSearch = searchQuery.trim().toLowerCase();
+  const selectedResourceSystems = useMemo(
+    () => new Set(resourceFilters.find((resource) => resource.id === selectedResourceId)?.systemIds ?? []),
+    [resourceFilters, selectedResourceId],
+  );
+  useEffect(() => {
+    if (selectedResourceId && !resourceFilters.some((resource) => resource.id === selectedResourceId)) setSelectedResourceId("");
+  }, [resourceFilters, selectedResourceId]);
   const sessionsBySystem = useMemo(() => {
     const bySystem = new Map<string, SessionState[]>();
     for (const session of sessions) {
@@ -1096,6 +1107,7 @@ function GalaxyMapViewportComponent({
       const base = new THREE.Vector3(position.x, 0, position.z);
       const matches =
         (!normalizedSearch || system.id.toLowerCase().includes(normalizedSearch) || systemLabel(system).toLowerCase().includes(normalizedSearch)) &&
+        (!selectedResourceId || selectedResourceSystems.has(system.id)) &&
         (selectedSquadHandles === null || (sessionsBySystem.get(system.id) ?? []).some((session) => selectedSquadHandles.has(session.sessionHandle))) &&
         !dimmedSystems.has(system.id);
       systemMatches.push(matches);
@@ -1563,6 +1575,8 @@ function GalaxyMapViewportComponent({
     routeSelectionMode,
     selectablePois,
     selectedSquadHandlesKey,
+    selectedResourceId,
+    selectedResourceSystems,
     visitedPois,
   ]);
 
@@ -1617,14 +1631,42 @@ function GalaxyMapViewportComponent({
         </div>
         <div className="galaxy-map-controls" aria-label="Galaxy map controls">
           {!embedded && (
-            <input
-              className="galaxy-map-search"
-              type="search"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Search systems..."
-              aria-label="Search systems"
-            />
+            <>
+              <input
+                className="galaxy-map-search"
+                type="search"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search systems..."
+                aria-label="Search systems"
+              />
+              {variant === "panel" && (
+                <div className="galaxy-map-resource-filter">
+                  <button
+                    type="button"
+                    className={selectedResourceId ? "galaxy-map-resource-toggle galaxy-map-resource-toggle--active" : "galaxy-map-resource-toggle"}
+                    onClick={() => setResourceFilterOpen((open) => !open)}
+                    aria-expanded={resourceFilterOpen}
+                    aria-controls="galaxy-map-resource-filter-menu"
+                  >
+                    Resources <span aria-hidden="true">{resourceFilterOpen ? "▴" : "▾"}</span>
+                  </button>
+                  {resourceFilterOpen && (
+                    <div id="galaxy-map-resource-filter-menu" className="galaxy-map-resource-menu">
+                      <label htmlFor="galaxy-map-resource-select">System resource</label>
+                      <select id="galaxy-map-resource-select" value={selectedResourceId} onChange={(event) => setSelectedResourceId(event.target.value)}>
+                        <option value="">All resources</option>
+                        {resourceFilters.map((resource) => (
+                          <option key={resource.id} value={resource.id}>
+                            {resource.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
           )}
           <button type="button" onClick={() => zoomBy(1.2)} title="Zoom in" aria-label="Zoom in">
             +
@@ -1754,7 +1796,8 @@ export const GalaxyMapViewport = memo(
     previous.dimmedSystemIds === next.dimmedSystemIds &&
     previous.selectablePoiIds === next.selectablePoiIds &&
     previous.onSystemClick === next.onSystemClick &&
-    previous.onSelectSystem === next.onSelectSystem,
+    previous.onSelectSystem === next.onSelectSystem &&
+    previous.resourceFilters === next.resourceFilters,
 );
 
 export default function GalaxyMap({ sessions }: GalaxyMapProps) {
@@ -1762,6 +1805,17 @@ export default function GalaxyMap({ sessions }: GalaxyMapProps) {
   const squads = useSquads();
   const map = selectGalaxyMap(prayer.galaxyMap);
   const graphLoading = !prayer.error && (prayer.connection === "connecting" || !map || map.systems.length === 0);
+  const resourceFilters = useMemo(
+    () =>
+      Object.entries(prayer.galaxyResources?.systemsByResource ?? {})
+        .filter(([, systemIds]) => systemIds.length > 0)
+        .map(([id, systemIds]) => {
+          const name = prayer.catalog?.itemsById[id]?.name.trim();
+          return { id, label: name && name !== id ? `${name} (${id})` : id, systemIds };
+        })
+        .sort((left, right) => left.label.localeCompare(right.label, undefined, { numeric: true, sensitivity: "base" })),
+    [prayer.catalog, prayer.galaxyResources],
+  );
   return (
     <GalaxyMapViewport
       sessions={sessions}
@@ -1771,6 +1825,7 @@ export default function GalaxyMap({ sessions }: GalaxyMapProps) {
       error={prayer.error?.message ?? null}
       variant="panel"
       squads={squads}
+      resourceFilters={resourceFilters}
     />
   );
 }
