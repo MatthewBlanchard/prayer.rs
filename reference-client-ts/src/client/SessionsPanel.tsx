@@ -1,8 +1,9 @@
 import { CSSProperties, type FormEvent, useEffect, useState } from "react";
-import { SessionInfo, type Squad } from "../shared/types.js";
+import { BriefcaseBusiness } from "lucide-react";
+import { SessionInfo, type JobRun, type Squad } from "../shared/types.js";
 import { type PassengerInfo } from "./api.js";
 import { CreditAmount } from "./Credits.js";
-import { fetchSquads } from "./api.js";
+import { connectEvents, fetchJobRuns, fetchSquads } from "./api.js";
 import { registerBot, type RegisterBotResult } from "./api/config.js";
 import type { ObservedPlayerView } from "./prayer/selectors.js";
 
@@ -425,7 +426,10 @@ interface SessionsPanelProps {
   systemEmpires: Record<string, string>;
   onHaltScript: (handle: string) => void;
   onRegistered: () => Promise<void>;
+  onOpenJob: (runId: string, squadId: string) => void;
 }
+
+const ACTIVE_JOB_STATUSES = new Set(["queued", "starting", "running", "stopping"]);
 
 function squadSections(sessions: SessionState[], squads: Squad[]): Array<{ id: string; title: string; color?: string; sessions: SessionState[] }> {
   const byIdentity = new Map(
@@ -447,8 +451,9 @@ function squadSections(sessions: SessionState[], squads: Squad[]): Array<{ id: s
   return sections;
 }
 
-export default function SessionsPanel({ sessions, systemEmpires, onHaltScript, onRegistered }: SessionsPanelProps) {
+export default function SessionsPanel({ sessions, systemEmpires, onHaltScript, onRegistered, onOpenJob }: SessionsPanelProps) {
   const [squads, setSquads] = useState<Squad[]>([]);
+  const [jobRuns, setJobRuns] = useState<JobRun[]>([]);
   const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(() => new Set());
   const [registerOpen, setRegisterOpen] = useState(false);
   const [username, setUsername] = useState("");
@@ -462,6 +467,18 @@ export default function SessionsPanel({ sessions, systemEmpires, onHaltScript, o
     refresh();
     window.addEventListener("prayer-squads-updated", refresh);
     return () => window.removeEventListener("prayer-squads-updated", refresh);
+  }, []);
+  useEffect(() => {
+    void fetchJobRuns().then(setJobRuns);
+    return connectEvents(
+      (event) => {
+        if (event.type === "job_run_updated") {
+          setJobRuns((current) => [event.run, ...current.filter((run) => run.id !== event.run.id)]);
+        }
+        if (event.type === "state_sync" && event.jobRuns) setJobRuns(event.jobRuns);
+      },
+      () => {},
+    );
   }, []);
   const groups = squadSections(sessions, squads);
   const toggleGroup = (id: string) =>
@@ -503,6 +520,7 @@ export default function SessionsPanel({ sessions, systemEmpires, onHaltScript, o
         {sessions.length === 0 && <div className="sessions-empty">no sessions</div>}
         {groups.map((group) => {
           const expanded = expandedGroupIds.has(group.id);
+          const activeJob = jobRuns.find((run) => run.squadId === group.id && ACTIVE_JOB_STATUSES.has(run.status));
           return (
             <section className="sessions-squad" data-collapsed={!expanded} key={group.id} style={{ "--job-color": group.color } as CSSProperties}>
               <div className="sessions-squad-header">
@@ -517,6 +535,16 @@ export default function SessionsPanel({ sessions, systemEmpires, onHaltScript, o
                   <span>{group.title}</span>
                   <span className="sessions-squad-count">{group.sessions.length}</span>
                 </button>
+                {activeJob ? (
+                  <button
+                    className="sessions-squad-job-btn"
+                    onClick={() => onOpenJob(activeJob.id, group.id)}
+                    title={`Open active job for ${group.title}`}
+                    aria-label={`Open active job for ${group.title}`}
+                  >
+                    <BriefcaseBusiness aria-hidden="true" strokeWidth={1.8} />
+                  </button>
+                ) : null}
               </div>
               {expanded &&
                 group.sessions.map((session) => (

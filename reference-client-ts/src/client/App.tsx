@@ -85,6 +85,9 @@ export default function App() {
   const prayer = usePrayer();
   const { sessions, setSessions, systemEmpires } = useFleetSessions(prayer.bots, prayer.galaxyMap);
   const [activeView, setActiveView] = useState<ActiveView>("galaxy");
+  const [requestedJobRunId, setRequestedJobRunId] = useState<string | null>(null);
+  const [requestedJobSquadId, setRequestedJobSquadId] = useState<string | null>(null);
+  const [jobNavigationRequest, setJobNavigationRequest] = useState(0);
 
   async function handleHaltSessionScript(handle: string) {
     setSessions((previous) => previous.map((session) => (session.sessionHandle === handle ? { ...session, runningScript: null } : session)));
@@ -140,7 +143,12 @@ export default function App() {
             {activeView === "game-chat" ? (
               <GameChatPanel sessions={sessions} />
             ) : activeView === "jobs" ? (
-              <JobsPanel sessions={sessions} />
+              <JobsPanel
+                sessions={sessions}
+                requestedRunId={requestedJobRunId}
+                requestedSquadId={requestedJobSquadId}
+                navigationRequest={jobNavigationRequest}
+              />
             ) : activeView === "skills" ? (
               <SkillsPanel sessions={sessions} />
             ) : activeView === "galaxy" ? (
@@ -178,6 +186,12 @@ export default function App() {
           systemEmpires={systemEmpires}
           onHaltScript={handleHaltSessionScript}
           onRegistered={prayer.refresh}
+          onOpenJob={(runId, squadId) => {
+            setRequestedJobRunId(runId);
+            setRequestedJobSquadId(squadId);
+            setJobNavigationRequest((current) => current + 1);
+            setActiveView("jobs");
+          }}
         />
       </div>
     </div>

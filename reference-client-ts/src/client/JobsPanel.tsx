@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { CatalogDumpItemsItem } from "@prayer/sdk/types";
 import type { JobConfig, JobDefinition, JobRun, Squad } from "../shared/types.js";
 import { connectEvents, createSquad, fetchJobDefinitions, fetchJobRuns, fetchSquads, startJobRun, stopJobRun, updateSquad } from "./api.js";
@@ -10,7 +10,17 @@ import { readVersionedStoredRecord, writeVersionedStored } from "./persistence.j
 import { findNearestStationPoi, isStationPoi } from "./nearestStation.js";
 
 const active = new Set(["queued", "starting", "running", "stopping"]);
-export default function JobsPanel({ sessions }: { sessions: SessionState[] }) {
+export default function JobsPanel({
+  sessions,
+  requestedRunId = null,
+  requestedSquadId = null,
+  navigationRequest = 0,
+}: {
+  sessions: SessionState[];
+  requestedRunId?: string | null;
+  requestedSquadId?: string | null;
+  navigationRequest?: number;
+}) {
   const prayer = usePrayer();
   const [definitions, setDefinitions] = useState<JobDefinition[]>([]);
   const [runs, setRuns] = useState<JobRun[]>([]);
@@ -21,13 +31,14 @@ export default function JobsPanel({ sessions }: { sessions: SessionState[] }) {
   const [jobMenuOpen, setJobMenuOpen] = useState(false);
   const [draft, setDraft] = useState<Record<string, unknown>>({});
   const [error, setError] = useState<string | null>(null);
+  const handledNavigationRequest = useRef<number | null>(null);
   useEffect(() => {
     void Promise.all([fetchJobDefinitions(), fetchJobRuns(), fetchSquads()])
       .then(([defs, history, loadedSquads]) => {
         setDefinitions(defs);
         setRuns(history);
         setSquads(loadedSquads);
-        setSquadId(loadedSquads[0]?.id ?? "");
+        setSquadId(requestedSquadId && loadedSquads.some((item) => item.id === requestedSquadId) ? requestedSquadId : (loadedSquads[0]?.id ?? ""));
         setKind((current) => (defs.some((item) => item.kind === current) ? current : (defs[0]?.kind ?? current)));
       })
       .catch((reason) => setError(String(reason)));
@@ -42,6 +53,20 @@ export default function JobsPanel({ sessions }: { sessions: SessionState[] }) {
   const definition = definitions.find((item) => item.kind === kind);
   const squad = squads.find((item) => item.id === squadId);
   const selectedRun = runs.find((run) => run.id === selectedRunId) ?? runs.find((run) => run.squadId === squadId && active.has(run.status));
+  useEffect(() => {
+    if (!requestedSquadId || navigationRequest === 0) return;
+    setSquadId(requestedSquadId);
+    setSelectedRunId(requestedRunId);
+  }, [navigationRequest, requestedRunId, requestedSquadId]);
+  useEffect(() => {
+    if (!requestedRunId || handledNavigationRequest.current === navigationRequest) return;
+    const requestedRun = runs.find((run) => run.id === requestedRunId);
+    if (!requestedRun) return;
+    handledNavigationRequest.current = navigationRequest;
+    setKind(requestedRun.kind);
+    setSquadId(requestedRun.squadId);
+    setSelectedRunId(requestedRun.id);
+  }, [navigationRequest, requestedRunId, runs]);
   const lockedBotIds = new Set(runs.filter((run) => active.has(run.status)).flatMap((run) => run.config.botIds));
   const assignedBotIds = new Set(squads.flatMap((item) => item.botIds));
   const availableSessions = sessions.filter((session) => !assignedBotIds.has(session.botId ?? session.sessionHandle));

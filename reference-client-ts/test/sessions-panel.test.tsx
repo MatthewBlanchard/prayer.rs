@@ -56,6 +56,7 @@ test("sessions panel exposes new bot registration", () => {
       systemEmpires: {},
       onHaltScript: () => undefined,
       onRegistered: async () => undefined,
+      onOpenJob: () => undefined,
     }),
   );
   assert.match(markup, /Register a new bot/);
