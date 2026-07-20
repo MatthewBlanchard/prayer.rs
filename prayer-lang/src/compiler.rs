@@ -242,6 +242,10 @@ fn command_action(name: &str, args: &[String]) -> Result<Action, CompileError> {
             player: req(0)?,
             role: req(1)?,
         },
+        "found_station" => Action::FoundStation {
+            name: req(0)?,
+            public_access: parse_bool(name, args, 1)?,
+        },
         "facility_build" => Action::FacilityBuild {
             facility_type: req(0)?,
         },
@@ -502,6 +506,14 @@ fn transfer_action(transfer: &AnalyzedTransfer) -> Result<Action, CompileError> 
 fn positive(value: i64) -> Result<u64, CompileError> {
     u64::try_from(value)
         .map_err(|_| CompileError::Invalid(format!("quantity {value} must be non-negative")))
+}
+
+fn parse_bool(name: &str, args: &[String], index: usize) -> Result<bool, CompileError> {
+    match args.get(index).map(String::as_str) {
+        Some("true") => Ok(true),
+        Some("false") => Ok(false),
+        _ => Err(invalid_args(name)),
+    }
 }
 
 fn trade_offer_action(name: &str, args: &[String]) -> Result<Action, CompileError> {

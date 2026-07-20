@@ -714,6 +714,36 @@
             "properties": {
               "request": {
                 "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "public_access": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "name",
+                  "public_access"
+                ],
+                "type": "object"
+              },
+              "type": {
+                "enum": [
+                  "found_station"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "request",
+              "type"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "request": {
+                "properties": {
                   "facility_type": {
                     "type": "string"
                   }

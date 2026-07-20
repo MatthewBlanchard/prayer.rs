@@ -94,6 +94,13 @@ pub fn render_action(action: &Action) -> String {
         Action::FactionSetRole { player, role } => {
             statement("faction_set_role", vec![player.clone(), role.clone()])
         }
+        Action::FoundStation {
+            name,
+            public_access,
+        } => statement(
+            "found_station",
+            vec![name.clone(), public_access.to_string()],
+        ),
         Action::FacilityBuild { facility_type } => {
             statement("facility_build", vec![facility_type.clone()])
         }
@@ -499,6 +506,9 @@ mod tests {
                     ArgType::ModuleId => "module-1",
                     ArgType::RecipeId => "recipe-1",
                     ArgType::Any if name == "say" && arg.name == "channel" => "system",
+                    ArgType::Any if name == "found_station" && arg.name == "public_access" => {
+                        "false"
+                    }
                     ArgType::Any => "value",
                 })
                 .map(str::to_owned)

@@ -154,7 +154,7 @@ test("complete action helper catalog emits canonical wire actions", () => {
   const expected = [
     "undock", "dock", "wait", "mine", "go", "halt", "transfer", "setHome", "find", "survey", "attack", "scan", "cloak", "hunt", "prepayTax",
     "acceptMission", "abandonMission", "declineMission", "completeMission", "loadPassenger", "unloadPassenger", "buy", "sell", "cancelBuy", "cancelSell",
-    "factionCreate", "factionInvite", "factionAcceptInvite", "factionKick", "factionSetRole", "facilityBuild", "factionFacilityBuild", "facilityUpgrade",
+    "factionCreate", "factionInvite", "factionAcceptInvite", "factionKick", "factionSetRole", "foundStation", "facilityBuild", "factionFacilityBuild", "facilityUpgrade",
     "factionFacilityUpgrade", "facilityDismantle", "factionFacilityDismantle", "facilitySetAccess", "facilitySetOutputPrice", "facilitySetName", "useItem",
     "repair", "repairModule", "recycle", "refuel", "selfDestruct", "switchShip", "renameShip", "installMod", "uninstallMod", "buyShip", "buyListedShip",
     "commissionShip", "sellShip", "scrapShip", "listShipForSale", "refitShip", "cancelCommission", "supplyCommission", "cancelShipListing", "placeShipBuyOrder",
@@ -169,6 +169,9 @@ test("complete action helper catalog emits canonical wire actions", () => {
     type: "transfer", request: { subject: { kind: "all_cargo" }, from: { kind: "cargo" }, to: { kind: "storage" } },
   });
   assert.deepEqual(actions.selfDestruct(), { type: "self_destruct" });
+  assert.deepEqual(actions.foundStation({ name: "Freeport Alpha", public_access: false }), {
+    type: "found_station", request: { name: "Freeport Alpha", public_access: false },
+  });
   assert.deepEqual(action("scan_poi", { poi_id: "poi-1" }), { type: "scan_poi", request: { poi_id: "poi-1" } });
 });
 

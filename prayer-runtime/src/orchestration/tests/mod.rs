@@ -607,6 +607,31 @@ fn faction_facility_build_maps_to_facility_api() {
 }
 
 #[test]
+fn found_station_maps_to_facility_api_without_docking_requirement() {
+    let mut engine = crate::engine::RuntimeEngine::default();
+    engine
+        .set_script(
+            "found_station \"Freeport Alpha\" false;",
+            Some(ExecutionReadContext::default()),
+        )
+        .expect("found station command should parse");
+    let command = engine
+        .decide_next(ExecutionReadContext::default())
+        .expect("decide")
+        .expect("command");
+    let mut planner = CommandPlanner::new(command.clone(), None, HashSet::new());
+    let (action, payload) = expect_api_call(
+        planner
+            .next(&PlanningState::default(), None)
+            .expect("plan station founding"),
+    );
+    assert_eq!(action, "spacemolt_facility/found_station");
+    let payload = payload.expect("payload");
+    assert_eq!(payload["name"], "Freeport Alpha");
+    assert_eq!(payload["public_access"], false);
+}
+
+#[test]
 fn facility_upgrade_maps_ids_and_type_to_facility_api() {
     let mut engine = crate::engine::RuntimeEngine::default();
     engine

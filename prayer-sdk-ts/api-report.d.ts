@@ -97,6 +97,10 @@ export declare const actions: {
         player: string;
         role: string;
     }) => Action;
+    readonly foundStation: (request: {
+        name: string;
+        public_access: boolean;
+    }) => Action;
     readonly facilityBuild: (request: {
         facility_type: string;
     }) => Action;
@@ -650,6 +654,12 @@ export type Action = {
         "role": string;
     };
     "type": "faction_set_role";
+} | {
+    "request": {
+        "name": string;
+        "public_access": boolean;
+    };
+    "type": "found_station";
 } | {
     "request": {
         "facility_type": string;

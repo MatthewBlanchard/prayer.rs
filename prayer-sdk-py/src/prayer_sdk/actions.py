@@ -51,7 +51,7 @@ def _named_helper(type: str):
 ACTION_TYPES = (
     "undock dock wait mine go halt transfer set_home find survey attack scan cloak hunt prepay_tax "
     "accept_mission abandon_mission decline_mission complete_mission load_passenger unload_passenger buy sell "
-    "cancel_buy cancel_sell faction_create faction_invite faction_accept_invite faction_kick faction_set_role "
+    "cancel_buy cancel_sell faction_create faction_invite faction_accept_invite faction_kick faction_set_role found_station "
     "facility_build faction_facility_build facility_upgrade faction_facility_upgrade facility_dismantle "
     "faction_facility_dismantle facility_set_access facility_set_output_price facility_set_name use_item repair "
     "repair_module recycle refuel self_destruct switch_ship rename_ship install_mod uninstall_mod buy_ship "

@@ -75,6 +75,13 @@ pub fn resolve_action(action: Action) -> Result<ResolvedAction, ActionBridgeErro
         Action::FactionSetRole { player, role } => {
             ("faction_set_role".into(), any_args(vec![player, role]))
         }
+        Action::FoundStation {
+            name,
+            public_access,
+        } => (
+            "found_station".into(),
+            any_args(vec![name, public_access.to_string()]),
+        ),
         Action::FacilityBuild { facility_type } => one("facility_build", facility_type),
         Action::FactionFacilityBuild { facility_type } => {
             one("faction_facility_build", facility_type)

@@ -208,392 +208,400 @@ class ActionVariant30(WireModel):
     type: Literal['faction_set_role'] = Field(...)
 
 class ActionVariant31Request(WireModel):
-    facility_type: str = Field(...)
+    name: str = Field(...)
+    public_access: bool = Field(...)
 
 class ActionVariant31(WireModel):
     request: ActionVariant31Request = Field(...)
-    type: Literal['facility_build'] = Field(...)
+    type: Literal['found_station'] = Field(...)
 
 class ActionVariant32Request(WireModel):
     facility_type: str = Field(...)
 
 class ActionVariant32(WireModel):
     request: ActionVariant32Request = Field(...)
-    type: Literal['faction_facility_build'] = Field(...)
+    type: Literal['facility_build'] = Field(...)
+
+class ActionVariant33Request(WireModel):
+    facility_type: str = Field(...)
 
 class ActionVariant33(WireModel):
-    request: FacilityUpgradeRequest = Field(...)
-    type: Literal['facility_upgrade'] = Field(...)
+    request: ActionVariant33Request = Field(...)
+    type: Literal['faction_facility_build'] = Field(...)
 
 class ActionVariant34(WireModel):
     request: FacilityUpgradeRequest = Field(...)
-    type: Literal['faction_facility_upgrade'] = Field(...)
-
-class ActionVariant35Request(WireModel):
-    facility_id: str = Field(...)
+    type: Literal['facility_upgrade'] = Field(...)
 
 class ActionVariant35(WireModel):
-    request: ActionVariant35Request = Field(...)
-    type: Literal['facility_dismantle'] = Field(...)
+    request: FacilityUpgradeRequest = Field(...)
+    type: Literal['faction_facility_upgrade'] = Field(...)
 
 class ActionVariant36Request(WireModel):
     facility_id: str = Field(...)
 
 class ActionVariant36(WireModel):
     request: ActionVariant36Request = Field(...)
-    type: Literal['faction_facility_dismantle'] = Field(...)
+    type: Literal['facility_dismantle'] = Field(...)
+
+class ActionVariant37Request(WireModel):
+    facility_id: str = Field(...)
 
 class ActionVariant37(WireModel):
+    request: ActionVariant37Request = Field(...)
+    type: Literal['faction_facility_dismantle'] = Field(...)
+
+class ActionVariant38(WireModel):
     request: FacilityAccessRequest = Field(...)
     type: Literal['facility_set_access'] = Field(...)
 
-class ActionVariant38(WireModel):
+class ActionVariant39(WireModel):
     request: FacilityOutputPriceRequest = Field(...)
     type: Literal['facility_set_output_price'] = Field(...)
 
-class ActionVariant39(WireModel):
+class ActionVariant40(WireModel):
     request: FacilityNameRequest = Field(...)
     type: Literal['facility_set_name'] = Field(...)
 
-class ActionVariant40Request(WireModel):
+class ActionVariant41Request(WireModel):
     item: str = Field(...)
     quantity: int = Field(...)
 
-class ActionVariant40(WireModel):
-    request: ActionVariant40Request = Field(...)
+class ActionVariant41(WireModel):
+    request: ActionVariant41Request = Field(...)
     type: Literal['use_item'] = Field(...)
 
-class ActionVariant41(WireModel):
+class ActionVariant42(WireModel):
     request: ServiceTransferRequest = Field(...)
     type: Literal['repair'] = Field(...)
 
-class ActionVariant42Request(WireModel):
+class ActionVariant43Request(WireModel):
     module: str = Field(...)
 
-class ActionVariant42(WireModel):
-    request: ActionVariant42Request = Field(...)
+class ActionVariant43(WireModel):
+    request: ActionVariant43Request = Field(...)
     type: Literal['repair_module'] = Field(...)
 
-class ActionVariant43(WireModel):
+class ActionVariant44(WireModel):
     request: RecycleRequest = Field(...)
     type: Literal['recycle'] = Field(...)
 
-class ActionVariant44(WireModel):
+class ActionVariant45(WireModel):
     request: ServiceTransferRequest = Field(...)
     type: Literal['refuel'] = Field(...)
 
-class ActionVariant45(WireModel):
+class ActionVariant46(WireModel):
     type: Literal['self_destruct'] = Field(...)
 
-class ActionVariant46Request(WireModel):
-    ship: str = Field(...)
-
-class ActionVariant46(WireModel):
-    request: ActionVariant46Request = Field(...)
-    type: Literal['switch_ship'] = Field(...)
-
 class ActionVariant47Request(WireModel):
-    name: str = Field(...)
+    ship: str = Field(...)
 
 class ActionVariant47(WireModel):
     request: ActionVariant47Request = Field(...)
-    type: Literal['rename_ship'] = Field(...)
+    type: Literal['switch_ship'] = Field(...)
 
 class ActionVariant48Request(WireModel):
-    module: str = Field(...)
+    name: str = Field(...)
 
 class ActionVariant48(WireModel):
     request: ActionVariant48Request = Field(...)
-    type: Literal['install_mod'] = Field(...)
+    type: Literal['rename_ship'] = Field(...)
 
 class ActionVariant49Request(WireModel):
     module: str = Field(...)
 
 class ActionVariant49(WireModel):
     request: ActionVariant49Request = Field(...)
-    type: Literal['uninstall_mod'] = Field(...)
+    type: Literal['install_mod'] = Field(...)
 
 class ActionVariant50Request(WireModel):
-    listing: str = Field(...)
+    module: str = Field(...)
 
 class ActionVariant50(WireModel):
     request: ActionVariant50Request = Field(...)
-    type: Literal['buy_ship'] = Field(...)
+    type: Literal['uninstall_mod'] = Field(...)
 
 class ActionVariant51Request(WireModel):
     listing: str = Field(...)
 
 class ActionVariant51(WireModel):
     request: ActionVariant51Request = Field(...)
-    type: Literal['buy_listed_ship'] = Field(...)
+    type: Literal['buy_ship'] = Field(...)
+
+class ActionVariant52Request(WireModel):
+    listing: str = Field(...)
 
 class ActionVariant52(WireModel):
-    request: CommissionShipRequest = Field(...)
-    type: Literal['commission_ship'] = Field(...)
-
-class ActionVariant53Request(WireModel):
-    ship: str = Field(...)
+    request: ActionVariant52Request = Field(...)
+    type: Literal['buy_listed_ship'] = Field(...)
 
 class ActionVariant53(WireModel):
-    request: ActionVariant53Request = Field(...)
-    type: Literal['sell_ship'] = Field(...)
+    request: CommissionShipRequest = Field(...)
+    type: Literal['commission_ship'] = Field(...)
 
 class ActionVariant54Request(WireModel):
     ship: str = Field(...)
 
 class ActionVariant54(WireModel):
     request: ActionVariant54Request = Field(...)
-    type: Literal['scrap_ship'] = Field(...)
+    type: Literal['sell_ship'] = Field(...)
 
 class ActionVariant55Request(WireModel):
-    price: int = Field(...)
     ship: str = Field(...)
 
 class ActionVariant55(WireModel):
     request: ActionVariant55Request = Field(...)
-    type: Literal['list_ship_for_sale'] = Field(...)
+    type: Literal['scrap_ship'] = Field(...)
+
+class ActionVariant56Request(WireModel):
+    price: int = Field(...)
+    ship: str = Field(...)
 
 class ActionVariant56(WireModel):
-    type: Literal['refit_ship'] = Field(...)
-
-class ActionVariant57Request(WireModel):
-    commission_id: str = Field(...)
+    request: ActionVariant56Request = Field(...)
+    type: Literal['list_ship_for_sale'] = Field(...)
 
 class ActionVariant57(WireModel):
-    request: ActionVariant57Request = Field(...)
-    type: Literal['cancel_commission'] = Field(...)
+    type: Literal['refit_ship'] = Field(...)
 
 class ActionVariant58Request(WireModel):
+    commission_id: str = Field(...)
+
+class ActionVariant58(WireModel):
+    request: ActionVariant58Request = Field(...)
+    type: Literal['cancel_commission'] = Field(...)
+
+class ActionVariant59Request(WireModel):
     commission_id: str = Field(...)
     item: str = Field(...)
     quantity: int = Field(...)
 
-class ActionVariant58(WireModel):
-    request: ActionVariant58Request = Field(...)
-    type: Literal['supply_commission'] = Field(...)
-
-class ActionVariant59Request(WireModel):
-    listing_id: str = Field(...)
-
 class ActionVariant59(WireModel):
     request: ActionVariant59Request = Field(...)
-    type: Literal['cancel_ship_listing'] = Field(...)
+    type: Literal['supply_commission'] = Field(...)
 
 class ActionVariant60Request(WireModel):
-    price: int = Field(...)
-    ship_class: str = Field(...)
+    listing_id: str = Field(...)
 
 class ActionVariant60(WireModel):
     request: ActionVariant60Request = Field(...)
-    type: Literal['place_ship_buy_order'] = Field(...)
+    type: Literal['cancel_ship_listing'] = Field(...)
 
 class ActionVariant61Request(WireModel):
-    order_id: str = Field(...)
+    price: int = Field(...)
+    ship_class: str = Field(...)
 
 class ActionVariant61(WireModel):
     request: ActionVariant61Request = Field(...)
-    type: Literal['cancel_ship_buy_order'] = Field(...)
+    type: Literal['place_ship_buy_order'] = Field(...)
 
 class ActionVariant62Request(WireModel):
     order_id: str = Field(...)
-    ship_id: str = Field(...)
 
 class ActionVariant62(WireModel):
     request: ActionVariant62Request = Field(...)
-    type: Literal['sell_ship_to_order'] = Field(...)
+    type: Literal['cancel_ship_buy_order'] = Field(...)
 
 class ActionVariant63Request(WireModel):
     order_id: str = Field(...)
+    ship_id: str = Field(...)
 
 class ActionVariant63(WireModel):
     request: ActionVariant63Request = Field(...)
-    type: Literal['cancel_order'] = Field(...)
+    type: Literal['sell_ship_to_order'] = Field(...)
 
 class ActionVariant64Request(WireModel):
     order_id: str = Field(...)
-    price_each: int = Field(...)
 
 class ActionVariant64(WireModel):
     request: ActionVariant64Request = Field(...)
-    type: Literal['modify_order'] = Field(...)
+    type: Literal['cancel_order'] = Field(...)
+
+class ActionVariant65Request(WireModel):
+    order_id: str = Field(...)
+    price_each: int = Field(...)
 
 class ActionVariant65(WireModel):
+    request: ActionVariant65Request = Field(...)
+    type: Literal['modify_order'] = Field(...)
+
+class ActionVariant66(WireModel):
     request: CraftRequest = Field(...)
     type: Literal['craft'] = Field(...)
 
-class ActionVariant66Request(WireModel):
-    job_id: str = Field(...)
-
-class ActionVariant66(WireModel):
-    request: ActionVariant66Request = Field(...)
-    type: Literal['cancel_craft_job'] = Field(...)
-
 class ActionVariant67Request(WireModel):
-    wreck_id: str = Field(...)
+    job_id: str = Field(...)
 
 class ActionVariant67(WireModel):
     request: ActionVariant67Request = Field(...)
-    type: Literal['salvage_wreck'] = Field(...)
+    type: Literal['cancel_craft_job'] = Field(...)
 
 class ActionVariant68Request(WireModel):
     wreck_id: str = Field(...)
 
 class ActionVariant68(WireModel):
     request: ActionVariant68Request = Field(...)
-    type: Literal['tow_wreck'] = Field(...)
+    type: Literal['salvage_wreck'] = Field(...)
+
+class ActionVariant69Request(WireModel):
+    wreck_id: str = Field(...)
 
 class ActionVariant69(WireModel):
-    type: Literal['scrap_wreck'] = Field(...)
+    request: ActionVariant69Request = Field(...)
+    type: Literal['tow_wreck'] = Field(...)
 
 class ActionVariant70(WireModel):
-    type: Literal['sell_wreck'] = Field(...)
+    type: Literal['scrap_wreck'] = Field(...)
 
 class ActionVariant71(WireModel):
-    type: Literal['release_wreck'] = Field(...)
-
-class ActionVariant72Request(WireModel):
-    ticks: int = Field(...)
+    type: Literal['sell_wreck'] = Field(...)
 
 class ActionVariant72(WireModel):
-    request: ActionVariant72Request = Field(...)
-    type: Literal['insure_ship'] = Field(...)
+    type: Literal['release_wreck'] = Field(...)
 
 class ActionVariant73Request(WireModel):
-    empire_id: str = Field(...)
+    ticks: int = Field(...)
 
 class ActionVariant73(WireModel):
     request: ActionVariant73Request = Field(...)
-    type: Literal['citizenship_apply'] = Field(...)
+    type: Literal['insure_ship'] = Field(...)
 
 class ActionVariant74Request(WireModel):
     empire_id: str = Field(...)
 
 class ActionVariant74(WireModel):
     request: ActionVariant74Request = Field(...)
-    type: Literal['citizenship_withdraw'] = Field(...)
+    type: Literal['citizenship_apply'] = Field(...)
 
 class ActionVariant75Request(WireModel):
     empire_id: str = Field(...)
 
 class ActionVariant75(WireModel):
     request: ActionVariant75Request = Field(...)
-    type: Literal['citizenship_renounce'] = Field(...)
+    type: Literal['citizenship_withdraw'] = Field(...)
+
+class ActionVariant76Request(WireModel):
+    empire_id: str = Field(...)
 
 class ActionVariant76(WireModel):
+    request: ActionVariant76Request = Field(...)
+    type: Literal['citizenship_renounce'] = Field(...)
+
+class ActionVariant77(WireModel):
     request: TradeOfferRequest = Field(...)
     type: Literal['trade_offer'] = Field(...)
 
-class ActionVariant77Request(WireModel):
+class ActionVariant78Request(WireModel):
     trade_id: str = Field(...)
 
-class ActionVariant77(WireModel):
-    request: ActionVariant77Request = Field(...)
+class ActionVariant78(WireModel):
+    request: ActionVariant78Request = Field(...)
     type: Literal['trade_accept'] = Field(...)
 
-class ActionVariant78(WireModel):
+class ActionVariant79(WireModel):
     type: Literal['faction_leave'] = Field(...)
 
-class ActionVariant79Request(WireModel):
-    player: str = Field(...)
-
-class ActionVariant79(WireModel):
-    request: ActionVariant79Request = Field(...)
-    type: Literal['faction_withdraw_invite'] = Field(...)
-
 class ActionVariant80Request(WireModel):
-    faction: str = Field(...)
+    player: str = Field(...)
 
 class ActionVariant80(WireModel):
     request: ActionVariant80Request = Field(...)
-    type: Literal['faction_propose_ally'] = Field(...)
+    type: Literal['faction_withdraw_invite'] = Field(...)
 
 class ActionVariant81Request(WireModel):
     faction: str = Field(...)
 
 class ActionVariant81(WireModel):
     request: ActionVariant81Request = Field(...)
-    type: Literal['faction_accept_ally'] = Field(...)
+    type: Literal['faction_propose_ally'] = Field(...)
 
 class ActionVariant82Request(WireModel):
     faction: str = Field(...)
 
 class ActionVariant82(WireModel):
     request: ActionVariant82Request = Field(...)
-    type: Literal['faction_remove_ally'] = Field(...)
+    type: Literal['faction_accept_ally'] = Field(...)
 
 class ActionVariant83Request(WireModel):
     faction: str = Field(...)
-    reason: str | None = Field(None)
 
 class ActionVariant83(WireModel):
     request: ActionVariant83Request = Field(...)
-    type: Literal['faction_declare_war'] = Field(...)
+    type: Literal['faction_remove_ally'] = Field(...)
 
 class ActionVariant84Request(WireModel):
     faction: str = Field(...)
-    message: str | None = Field(None)
+    reason: str | None = Field(None)
 
 class ActionVariant84(WireModel):
     request: ActionVariant84Request = Field(...)
-    type: Literal['faction_propose_peace'] = Field(...)
+    type: Literal['faction_declare_war'] = Field(...)
 
 class ActionVariant85Request(WireModel):
     faction: str = Field(...)
+    message: str | None = Field(None)
 
 class ActionVariant85(WireModel):
     request: ActionVariant85Request = Field(...)
-    type: Literal['faction_accept_peace'] = Field(...)
+    type: Literal['faction_propose_peace'] = Field(...)
 
 class ActionVariant86Request(WireModel):
     faction: str = Field(...)
 
 class ActionVariant86(WireModel):
     request: ActionVariant86Request = Field(...)
-    type: Literal['faction_set_enemy'] = Field(...)
+    type: Literal['faction_accept_peace'] = Field(...)
 
 class ActionVariant87Request(WireModel):
     faction: str = Field(...)
 
 class ActionVariant87(WireModel):
     request: ActionVariant87Request = Field(...)
-    type: Literal['faction_remove_enemy'] = Field(...)
+    type: Literal['faction_set_enemy'] = Field(...)
 
 class ActionVariant88Request(WireModel):
-    quantity: int = Field(...)
+    faction: str = Field(...)
 
 class ActionVariant88(WireModel):
     request: ActionVariant88Request = Field(...)
-    type: Literal['faction_prepay_tax'] = Field(...)
+    type: Literal['faction_remove_enemy'] = Field(...)
 
 class ActionVariant89Request(WireModel):
-    mission_id: str = Field(...)
+    quantity: int = Field(...)
 
 class ActionVariant89(WireModel):
     request: ActionVariant89Request = Field(...)
-    type: Literal['faction_cancel_mission'] = Field(...)
+    type: Literal['faction_prepay_tax'] = Field(...)
+
+class ActionVariant90Request(WireModel):
+    mission_id: str = Field(...)
 
 class ActionVariant90(WireModel):
-    type: Literal['espionage'] = Field(...)
-
-class ActionVariant91Request(WireModel):
-    poi_id: str = Field(...)
+    request: ActionVariant90Request = Field(...)
+    type: Literal['faction_cancel_mission'] = Field(...)
 
 class ActionVariant91(WireModel):
-    request: ActionVariant91Request = Field(...)
-    type: Literal['scan_poi'] = Field(...)
+    type: Literal['espionage'] = Field(...)
 
 class ActionVariant92Request(WireModel):
-    distress_type: str | None = Field(None)
+    poi_id: str = Field(...)
 
 class ActionVariant92(WireModel):
     request: ActionVariant92Request = Field(...)
-    type: Literal['distress_signal'] = Field(...)
+    type: Literal['scan_poi'] = Field(...)
+
+class ActionVariant93Request(WireModel):
+    distress_type: str | None = Field(None)
 
 class ActionVariant93(WireModel):
+    request: ActionVariant93Request = Field(...)
+    type: Literal['distress_signal'] = Field(...)
+
+class ActionVariant94(WireModel):
     request: SayRequest = Field(...)
     type: Literal['say'] = Field(...)
 
-class Action(RootModel['ActionVariant1 | ActionVariant2 | ActionVariant3 | ActionVariant4 | ActionVariant5 | ActionVariant6 | ActionVariant7 | ActionVariant8 | ActionVariant9 | ActionVariant10 | ActionVariant11 | ActionVariant12 | ActionVariant13 | ActionVariant14 | ActionVariant15 | ActionVariant16 | ActionVariant17 | ActionVariant18 | ActionVariant19 | ActionVariant20 | ActionVariant21 | ActionVariant22 | ActionVariant23 | ActionVariant24 | ActionVariant25 | ActionVariant26 | ActionVariant27 | ActionVariant28 | ActionVariant29 | ActionVariant30 | ActionVariant31 | ActionVariant32 | ActionVariant33 | ActionVariant34 | ActionVariant35 | ActionVariant36 | ActionVariant37 | ActionVariant38 | ActionVariant39 | ActionVariant40 | ActionVariant41 | ActionVariant42 | ActionVariant43 | ActionVariant44 | ActionVariant45 | ActionVariant46 | ActionVariant47 | ActionVariant48 | ActionVariant49 | ActionVariant50 | ActionVariant51 | ActionVariant52 | ActionVariant53 | ActionVariant54 | ActionVariant55 | ActionVariant56 | ActionVariant57 | ActionVariant58 | ActionVariant59 | ActionVariant60 | ActionVariant61 | ActionVariant62 | ActionVariant63 | ActionVariant64 | ActionVariant65 | ActionVariant66 | ActionVariant67 | ActionVariant68 | ActionVariant69 | ActionVariant70 | ActionVariant71 | ActionVariant72 | ActionVariant73 | ActionVariant74 | ActionVariant75 | ActionVariant76 | ActionVariant77 | ActionVariant78 | ActionVariant79 | ActionVariant80 | ActionVariant81 | ActionVariant82 | ActionVariant83 | ActionVariant84 | ActionVariant85 | ActionVariant86 | ActionVariant87 | ActionVariant88 | ActionVariant89 | ActionVariant90 | ActionVariant91 | ActionVariant92 | ActionVariant93']):
+class Action(RootModel['ActionVariant1 | ActionVariant2 | ActionVariant3 | ActionVariant4 | ActionVariant5 | ActionVariant6 | ActionVariant7 | ActionVariant8 | ActionVariant9 | ActionVariant10 | ActionVariant11 | ActionVariant12 | ActionVariant13 | ActionVariant14 | ActionVariant15 | ActionVariant16 | ActionVariant17 | ActionVariant18 | ActionVariant19 | ActionVariant20 | ActionVariant21 | ActionVariant22 | ActionVariant23 | ActionVariant24 | ActionVariant25 | ActionVariant26 | ActionVariant27 | ActionVariant28 | ActionVariant29 | ActionVariant30 | ActionVariant31 | ActionVariant32 | ActionVariant33 | ActionVariant34 | ActionVariant35 | ActionVariant36 | ActionVariant37 | ActionVariant38 | ActionVariant39 | ActionVariant40 | ActionVariant41 | ActionVariant42 | ActionVariant43 | ActionVariant44 | ActionVariant45 | ActionVariant46 | ActionVariant47 | ActionVariant48 | ActionVariant49 | ActionVariant50 | ActionVariant51 | ActionVariant52 | ActionVariant53 | ActionVariant54 | ActionVariant55 | ActionVariant56 | ActionVariant57 | ActionVariant58 | ActionVariant59 | ActionVariant60 | ActionVariant61 | ActionVariant62 | ActionVariant63 | ActionVariant64 | ActionVariant65 | ActionVariant66 | ActionVariant67 | ActionVariant68 | ActionVariant69 | ActionVariant70 | ActionVariant71 | ActionVariant72 | ActionVariant73 | ActionVariant74 | ActionVariant75 | ActionVariant76 | ActionVariant77 | ActionVariant78 | ActionVariant79 | ActionVariant80 | ActionVariant81 | ActionVariant82 | ActionVariant83 | ActionVariant84 | ActionVariant85 | ActionVariant86 | ActionVariant87 | ActionVariant88 | ActionVariant89 | ActionVariant90 | ActionVariant91 | ActionVariant92 | ActionVariant93 | ActionVariant94']):
     model_config = ConfigDict(frozen=True)
 
 class ActionOverrideRequest(WireModel):

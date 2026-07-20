@@ -4,7 +4,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Current persisted action-envelope schema.
-pub const ACTION_SCHEMA_VERSION: u32 = 5;
+pub const ACTION_SCHEMA_VERSION: u32 = 6;
 
 macro_rules! string_id {
     ($name:ident) => {
@@ -345,6 +345,10 @@ pub enum Action {
     FactionSetRole {
         player: String,
         role: String,
+    },
+    FoundStation {
+        name: String,
+        public_access: bool,
     },
     FacilityBuild {
         facility_type: String,

@@ -65,6 +65,7 @@ pub(crate) fn resolve_command(action: &str) -> Result<ResolvedCommandDef, Operat
         "espionage" => "spacemolt_intel/espionage".to_string(),
         "scan_poi" => "spacemolt_intel/scan_poi".to_string(),
         "faction_set_role" => "spacemolt_faction_admin/promote".to_string(),
+        "found_station" => "spacemolt_facility/found_station".to_string(),
         // DSL namespaces are naming conventions, not endpoint registries.
         value if value.starts_with("faction_facility_") => format!(
             "spacemolt_facility/faction_{}",
@@ -168,6 +169,10 @@ pub(crate) fn args_to_generated_payload(
             .unwrap_or(true);
         map.insert("enable".into(), Value::Bool(enabled));
         map.remove("mode");
+    }
+    if command_name == "found_station" {
+        let public_access = args.get(1).is_some_and(|value| value.as_text() == "true");
+        map.insert("public_access".into(), Value::Bool(public_access));
     }
     if command_name == "commission_ship" {
         map.insert(

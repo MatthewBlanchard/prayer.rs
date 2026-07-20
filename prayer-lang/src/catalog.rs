@@ -136,6 +136,10 @@ pub const COMMAND_DOCS: &[(&str, &str)] = &[
     ("faction_set_role", "Assign a faction member the recruit, member, officer, or leader role."),
     // Facilities
     (
+        "found_station",
+        "Found a faction station with the given name; pass true to allow public docking or false to keep it private.",
+    ),
+    (
         "facility_build",
         "Build a personal facility of the given facility type at the current docked location.",
     ),
@@ -538,6 +542,16 @@ pub fn default_command_catalog() -> HashMap<String, CommandSpec> {
             vec![
                 arg("player", ArgType::Any, true),
                 arg("role", ArgType::Any, true),
+            ],
+        ),
+    );
+    commands.insert(
+        "found_station".to_string(),
+        command(
+            "found_station",
+            vec![
+                arg("name", ArgType::Any, true),
+                arg("public_access", ArgType::Any, true),
             ],
         ),
     );

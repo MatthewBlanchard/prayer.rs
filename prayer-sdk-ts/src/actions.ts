@@ -66,6 +66,7 @@ export const actions = {
   loadPassenger: requested("load_passenger"), unloadPassenger: requested("unload_passenger"), buy: requested("buy"), sell: requested("sell"),
   cancelBuy: requested("cancel_buy"), cancelSell: requested("cancel_sell"), factionCreate: requested("faction_create"), factionInvite: requested("faction_invite"),
   factionAcceptInvite: requested("faction_accept_invite"), factionKick: requested("faction_kick"), factionSetRole: requested("faction_set_role"),
+  foundStation: requested("found_station"),
   facilityBuild: requested("facility_build"), factionFacilityBuild: requested("faction_facility_build"), facilityUpgrade: requested("facility_upgrade"),
   factionFacilityUpgrade: requested("faction_facility_upgrade"), facilityDismantle: requested("facility_dismantle"), factionFacilityDismantle: requested("faction_facility_dismantle"),
   facilitySetAccess: requested("facility_set_access"), facilitySetOutputPrice: requested("facility_set_output_price"), facilitySetName: requested("facility_set_name"),
