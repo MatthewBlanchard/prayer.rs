@@ -31,6 +31,7 @@ pub struct ScriptRunInfo {
     origin: &'static str,
     started_utc: DateTime<Utc>,
     halt_tx: watch::Sender<bool>,
+    action_generation: Option<u64>,
 }
 
 fn fleet_execution_projection(
@@ -99,16 +100,20 @@ pub struct ScriptRunGuard {
     started_utc: DateTime<Utc>,
     session: Arc<Mutex<SessionHandle>>,
     execution_id: Uuid,
+    action_generation: Option<u64>,
+    released: bool,
 }
 
 impl Drop for ScriptRunGuard {
     fn drop(&mut self) {
-        let mut active_runs = self.active_script_runs.lock();
-        let should_remove = active_runs
-            .get(&self.id)
-            .is_some_and(|run| run.origin == self.origin && run.started_utc == self.started_utc);
-        if should_remove {
-            active_runs.remove(&self.id);
+        if !self.released {
+            let mut active_runs = self.active_script_runs.lock();
+            let should_remove = active_runs.get(&self.id).is_some_and(|run| {
+                run.origin == self.origin && run.started_utc == self.started_utc
+            });
+            if should_remove {
+                active_runs.remove(&self.id);
+            }
         }
         let session = Arc::clone(&self.session);
         let execution_id = self.execution_id;
@@ -631,6 +636,7 @@ impl RuntimeService {
                     origin,
                     started_utc,
                     halt_tx,
+                    action_generation: origin.starts_with("sdk action").then_some(0),
                 },
             );
         }
@@ -682,7 +688,55 @@ impl RuntimeService {
             started_utc,
             session: session_handle,
             execution_id,
+            action_generation: origin.starts_with("sdk action").then_some(0),
+            released: false,
         })
+    }
+
+    /// Ensure an action runner owns this session. An existing action runner is
+    /// reusable: advancing its generation makes it re-check the scheduler before
+    /// it can unregister. Explicit script runners remain exclusive.
+    pub async fn ensure_action_runner(
+        self: &Arc<Self>,
+        id: Uuid,
+        origin: &'static str,
+    ) -> Result<(), SdkError> {
+        {
+            let mut active_runs = self.active_script_runs.lock();
+            if let Some(existing) = active_runs.get_mut(&id) {
+                if let Some(generation) = existing.action_generation.as_mut() {
+                    *generation = generation.wrapping_add(1);
+                    return Ok(());
+                }
+                return Err(SdkError::BadRequest(format!(
+                    "script already running for session {id} via {} since {}",
+                    existing.origin, existing.started_utc
+                )));
+            }
+        }
+        self.spawn_script_runner(id, origin).await
+    }
+
+    async fn action_runner_should_continue(&self, guard: &mut ScriptRunGuard) -> bool {
+        let session = match self.get_session(guard.id).await {
+            Ok(session) => session,
+            Err(_) => return false,
+        };
+        let session = session.lock().await;
+        let scheduler_has_work = session.engine.has_unfinished_action_run();
+        let mut active_runs = guard.active_script_runs.lock();
+        let Some(active) = active_runs.get(&guard.id) else {
+            guard.released = true;
+            return false;
+        };
+        let generation_changed = active.action_generation != guard.action_generation;
+        if scheduler_has_work || generation_changed {
+            guard.action_generation = active.action_generation;
+            return true;
+        }
+        active_runs.remove(&guard.id);
+        guard.released = true;
+        false
     }
 
     pub async fn script_run_info(&self, id: Uuid) -> Option<ScriptRunInfo> {
@@ -717,11 +771,19 @@ impl RuntimeService {
         &self,
         id: Uuid,
         poll_across_waits: bool,
-        _run_guard: ScriptRunGuard,
+        mut run_guard: ScriptRunGuard,
     ) -> Result<ExecuteScriptResponse, SdkError> {
-        let result = self
-            .execute_script_with_wait_policy(id, poll_across_waits)
-            .await;
+        let result = loop {
+            let result = self
+                .execute_script_with_wait_policy(id, poll_across_waits)
+                .await;
+            if run_guard.action_generation.is_some()
+                && self.action_runner_should_continue(&mut run_guard).await
+            {
+                continue;
+            }
+            break result;
+        };
         let session = self.get_session(id).await?;
         let mut session = session.lock().await;
         let last_line = session.engine.snapshot().current_script_line;

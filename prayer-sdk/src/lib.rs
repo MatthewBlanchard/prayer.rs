@@ -1136,7 +1136,7 @@ impl BotHandle {
         let session_id = lane.session_id;
         if let Err(error) = lane
             .service
-            .start_script_runner(session_id.into_uuid(), "sdk action run")
+            .ensure_action_runner(session_id.into_uuid(), "sdk action run")
             .await
         {
             let _ = lane
@@ -1646,7 +1646,7 @@ impl ActionLane {
         let session_id = self.session_id.into_uuid();
         if let Err(error) = self
             .service
-            .start_script_runner(session_id, "sdk action lane")
+            .ensure_action_runner(session_id, "sdk action lane")
             .await
         {
             let _ = self

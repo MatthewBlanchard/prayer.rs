@@ -3915,6 +3915,24 @@ async fn script_runner_registry_rejects_duplicate_execute() {
 }
 
 #[tokio::test]
+async fn action_runner_registry_reuses_an_active_action_runner() {
+    let service = Arc::new(RuntimeService::new());
+    let id = service.create_session();
+    let run_guard = service
+        .begin_script_run(id, "sdk action run")
+        .await
+        .expect("begin action runner");
+
+    service
+        .ensure_action_runner(id, "sdk action run")
+        .await
+        .expect("active action runner should be reusable");
+
+    assert!(service.script_run_info(id).await.is_some());
+    drop(run_guard);
+}
+
+#[tokio::test]
 async fn script_runner_guard_releases_on_drop() {
     let service = RuntimeService::new();
     let id = service.create_session();
