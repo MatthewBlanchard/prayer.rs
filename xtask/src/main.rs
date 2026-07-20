@@ -2,9 +2,12 @@ use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 use std::{
     env, fs,
+    fs::File,
+    io::{self, Read, Write},
     net::TcpStream,
     path::{Path, PathBuf},
-    process::{Child, Command},
+    process::{Child, Command, Stdio},
+    sync::{Arc, Mutex},
     thread,
     time::Duration,
     time::{SystemTime, UNIX_EPOCH},
@@ -79,7 +82,7 @@ fn main() -> Result<()> {
         Task::Generate => generate(&root),
         Task::Check => check(&root),
         Task::Build { offline, base_url } => build(&root, &base_url, offline),
-        Task::Run { client } => run_services(client),
+        Task::Run { client } => run_services(&root, client),
         Task::AuditPublicApi => audit_public_api(&root),
         Task::ShowLogs { lines } => show_logs(&root, lines),
         Task::PruneLogs => prune_logs(&root),
@@ -376,7 +379,7 @@ fn status(command: &mut Command, label: &str) -> Result<()> {
     Ok(())
 }
 
-fn run_services(client: Option<Client>) -> Result<()> {
+fn run_services(root: &Path, client: Option<Client>) -> Result<()> {
     ensure_port_free("127.0.0.1:7777", "Prayer API")?;
     // Keep compilation outside the readiness window. A clean API build can take
     // longer than the startup timeout, but that does not mean startup failed.
@@ -384,12 +387,20 @@ fn run_services(client: Option<Client>) -> Result<()> {
         "cargo",
         &["build", "-p", "prayer-api", "--bin", "prayer-api"],
     )?;
-    let mut api = spawn("cargo", &["run", "-p", "prayer-api", "--bin", "prayer-api"])?;
+    let run_logs = prepare_run_logs(root, client.is_some())?;
+    println!("Writing service logs to {}", run_logs.display());
+    let mut api_command = Command::new("cargo");
+    api_command.args(["run", "-p", "prayer-api", "--bin", "prayer-api"]);
+    let mut api = spawn_logged(&mut api_command, "cargo", &run_logs.join("api.log"))?;
     let result = (|| {
         wait_for_port("127.0.0.1:7777", "Prayer API")?;
         match client {
             Some(Client::Web) => {
-                run_in(PathBuf::from("reference-client-ts"), "npm", &["run", "dev"])
+                let mut client_command = Command::new("npm");
+                client_command
+                    .current_dir("reference-client-ts")
+                    .args(["run", "dev"]);
+                wait_logged(&mut client_command, "npm", &run_logs.join("client.log"))
             }
             None => api
                 .wait()
@@ -406,6 +417,93 @@ fn run_services(client: Option<Client>) -> Result<()> {
     let _ = api.kill();
     let _ = api.wait();
     result
+}
+
+fn prepare_run_logs(root: &Path, include_client: bool) -> Result<PathBuf> {
+    let logs = log_root(root);
+    let run_id = format!(
+        "run-{}-{}",
+        SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
+        std::process::id()
+    );
+    let run = logs.join("runs").join(run_id);
+    let latest = logs.join("latest");
+    fs::create_dir_all(&run)?;
+    fs::create_dir_all(&latest)?;
+    for service in ["api", "client"] {
+        let latest_file = latest.join(format!("{service}.log"));
+        if latest_file.symlink_metadata().is_ok() {
+            fs::remove_file(&latest_file)
+                .with_context(|| format!("removing stale log link {}", latest_file.display()))?;
+        }
+        if service == "api" || include_client {
+            let run_file = run.join(format!("{service}.log"));
+            File::create(&run_file)?;
+            fs::hard_link(&run_file, &latest_file).with_context(|| {
+                format!(
+                    "linking latest log {} to {}",
+                    latest_file.display(),
+                    run_file.display()
+                )
+            })?;
+        }
+    }
+    prune_logs(root)?;
+    Ok(run)
+}
+
+fn wait_logged(command: &mut Command, label: &str, log_path: &Path) -> Result<()> {
+    let mut child = spawn_logged(command, label, log_path)?;
+    let status = child
+        .wait()
+        .with_context(|| format!("failed waiting for {label}"))?;
+    if !status.success() {
+        bail!("{label} failed with {status}");
+    }
+    Ok(())
+}
+
+fn spawn_logged(command: &mut Command, label: &str, log_path: &Path) -> Result<Child> {
+    let log = Arc::new(Mutex::new(
+        File::options()
+            .append(true)
+            .open(log_path)
+            .with_context(|| format!("opening log {}", log_path.display()))?,
+    ));
+    let mut child = command
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .with_context(|| format!("failed to start {label}"))?;
+    if let Some(stdout) = child.stdout.take() {
+        pump_output(stdout, io::stdout(), Arc::clone(&log));
+    }
+    if let Some(stderr) = child.stderr.take() {
+        pump_output(stderr, io::stderr(), log);
+    }
+    Ok(child)
+}
+
+fn pump_output(
+    mut source: impl Read + Send + 'static,
+    mut terminal: impl Write + Send + 'static,
+    log: Arc<Mutex<File>>,
+) {
+    thread::spawn(move || {
+        let mut buffer = [0_u8; 8192];
+        while let Ok(count) = source.read(&mut buffer) {
+            if count == 0 {
+                break;
+            }
+            let bytes = &buffer[..count];
+            let _ = terminal.write_all(bytes);
+            let _ = terminal.flush();
+            if let Ok(mut file) = log.lock() {
+                let _ = file.write_all(bytes);
+                let _ = file.flush();
+            }
+        }
+    });
 }
 
 fn ensure_port_free(address: &str, service: &str) -> Result<()> {
@@ -654,10 +752,4 @@ fn replace_file(path: &Path, contents: &[u8]) -> Result<()> {
             temporary.display()
         )
     })
-}
-fn spawn(program: &str, args: &[&str]) -> Result<Child> {
-    Command::new(program)
-        .args(args)
-        .spawn()
-        .with_context(|| format!("failed to start {program}"))
 }
