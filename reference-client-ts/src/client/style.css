@@ -3179,6 +3179,10 @@ button.social-faction:hover {
   color: var(--yellow);
 }
 
+.economy-profit-status[data-status="draw"] span {
+  color: var(--text-dim);
+}
+
 .economy-profit-status small {
   display: block;
   color: var(--text-dim);
