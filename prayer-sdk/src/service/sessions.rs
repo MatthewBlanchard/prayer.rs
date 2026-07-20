@@ -434,7 +434,11 @@ impl RuntimeService {
         }
         session.push_status("Restored from runtime session store");
         let snapshot = session.engine.snapshot();
-        let should_kick = !snapshot.is_halted && !snapshot.is_finished;
+        // Typed-action queues own their runner lifecycle independently of the
+        // legacy PrayerLang producer flags. If scheduler work survived a
+        // restart, it must always cause a runner to be restored.
+        let should_kick = session.engine.has_unfinished_action_run()
+            || (!snapshot.is_halted && !snapshot.is_finished);
         info!(
             id = %record.id,
             label = %session.label,

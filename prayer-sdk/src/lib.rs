@@ -1133,13 +1133,22 @@ impl BotHandle {
                 .await;
             return Err(error);
         }
-        let service = Arc::clone(&lane.service);
         let session_id = lane.session_id;
-        lane.service.spawn_background(async move {
-            let _ = service
-                .start_script_runner(session_id.into_uuid(), "sdk action run")
+        if let Err(error) = lane
+            .service
+            .start_script_runner(session_id.into_uuid(), "sdk action run")
+            .await
+        {
+            let _ = lane
+                .service
+                .cancel_action_run(
+                    session_id.into_uuid(),
+                    &run_id,
+                    "action runner failed to start".into(),
+                )
                 .await;
-        });
+            return Err(error);
+        }
         Ok(ActionRunHandle {
             session_id,
             run_id,
@@ -1634,13 +1643,22 @@ impl ActionLane {
         self.service
             .submit_action_batch(self.session_id.into_uuid(), &self.claim, actions)
             .await?;
-        let service = Arc::clone(&self.service);
         let session_id = self.session_id.into_uuid();
-        self.service.spawn_background(async move {
-            let _ = service
-                .start_script_runner(session_id, "sdk action lane")
+        if let Err(error) = self
+            .service
+            .start_script_runner(session_id, "sdk action lane")
+            .await
+        {
+            let _ = self
+                .service
+                .cancel_action_run(
+                    session_id,
+                    &self.run_id,
+                    "action runner failed to start".into(),
+                )
                 .await;
-        });
+            return Err(error);
+        }
         loop {
             if let Some(run) = self.service.action_run(session_id, &self.run_id).await? {
                 if let Some(outcome) = run.outcome {

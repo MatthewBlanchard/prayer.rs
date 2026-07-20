@@ -701,6 +701,25 @@ impl RuntimeEngine {
         self.action_run.as_ref().filter(|run| &run.run_id == run_id).cloned()
     }
 
+    /// Return the terminal outcome of the active typed-action run, if any.
+    pub fn action_run_outcome(&self) -> Option<&ActionBatchOutcome> {
+        self.action_run.as_ref().and_then(|run| run.outcome.as_ref())
+    }
+
+    /// Whether a typed-action run still owns executable scheduler work.
+    pub fn has_unfinished_action_run(&self) -> bool {
+        self.action_run
+            .as_ref()
+            .is_some_and(|run| run.outcome.is_none())
+            && {
+                let scheduler = self.scheduler.snapshot();
+                scheduler.running.is_some()
+                    || !scheduler.pending.is_empty()
+                    || scheduler.interrupt.is_some()
+                    || !scheduler.interrupt_pending.is_empty()
+            }
+    }
+
     pub fn cancel_action_run(&mut self, run_id: &RunId, reason: String) -> Result<PersistedActionRun, EngineError> {
         let run = self.action_run.as_mut().filter(|run| &run.run_id == run_id)
             .ok_or_else(|| EngineError::InvalidState("action run not found".into()))?;
@@ -2396,4 +2415,40 @@ unload_passenger all;"#
         );
         assert_eq!(engine.override_scheduler_prayer_projection(), "");
         assert_eq!(engine.normal_scheduler_prayer_projection(), "wait 3;");
+    }
+
+    #[test]
+    fn unfinished_action_run_tracks_scheduler_work_until_terminal() {
+        let mut engine = RuntimeEngine::new();
+        let run_id = RunId("owned-runner".into());
+        let claim = engine
+            .try_acquire_action_run(run_id.clone())
+            .expect("claim action lane");
+        engine
+            .submit_action_batch(
+                &claim,
+                vec![ActionEnvelope::new(
+                    "owned-wait",
+                    prayer_actions::Action::Wait { ticks: 0 },
+                    ActionOrigin::Manual { run_id },
+                )],
+            )
+            .expect("submit action batch");
+
+        assert!(engine.has_unfinished_action_run());
+        let command = engine
+            .decide_next(ExecutionReadContext::default())
+            .expect("decide")
+            .expect("command");
+        engine.execute_result(
+            &command,
+            EngineExecutionResult::default(),
+            ExecutionReadContext::default(),
+        );
+
+        assert!(!engine.has_unfinished_action_run());
+        assert!(matches!(
+            engine.action_run_outcome(),
+            Some(ActionBatchOutcome::Succeeded)
+        ));
     }

@@ -683,6 +683,16 @@ impl RuntimeService {
         );
 
         let snapshot = self.snapshot(id).await?;
+        let action_run_completed = {
+            let session = self.get_session(id).await?;
+            let session = session.lock().await;
+            session.engine.action_run_outcome().is_some_and(|outcome| {
+                matches!(
+                    outcome,
+                    prayer_runtime::execution::ActionBatchOutcome::Succeeded
+                )
+            })
+        };
         let diff = {
             let session = self.get_session(id).await?;
             let session = session.lock().await;
@@ -700,7 +710,7 @@ impl RuntimeService {
         Ok(ExecuteScriptResponse {
             steps_executed,
             halted: snapshot.is_halted,
-            completed: snapshot.is_finished,
+            completed: snapshot.is_finished || action_run_completed,
             error,
             halt_message,
             diff,
