@@ -7764,6 +7764,53 @@
         ],
         "type": "object"
       },
+      "MarketMovementHealth": {
+        "description": "Current backing health for one inventory-backed market movement.",
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "backedQuantity": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/RuntimeInventoryClaimHealthDto"
+            },
+            "type": "array"
+          },
+          "fullyBacked": {
+            "type": "boolean"
+          },
+          "movementId": {
+            "type": "string"
+          },
+          "requestedQuantity": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "shortfallQuantity": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/MarketMovementStatus"
+          }
+        },
+        "required": [
+          "active",
+          "backedQuantity",
+          "claims",
+          "fullyBacked",
+          "movementId",
+          "requestedQuantity",
+          "shortfallQuantity",
+          "status"
+        ],
+        "title": "RuntimeInventoryMovementHealthDto",
+        "type": "object"
+      },
       "MarketMovementList": {
         "description": "Active and historical inventory movements.",
         "properties": {
@@ -10022,6 +10069,41 @@
           "pois",
           "poisComplete",
           "wildlife"
+        ],
+        "type": "object"
+      },
+      "RuntimeInventoryClaimHealthDto": {
+        "description": "FIFO backing allocated to one market-depth claim in a movement.",
+        "properties": {
+          "backedQuantity": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "itemId": {
+            "type": "string"
+          },
+          "locationId": {
+            "type": "string"
+          },
+          "requestedQuantity": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "shortfallQuantity": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "sourceKind": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "backedQuantity",
+          "itemId",
+          "locationId",
+          "requestedQuantity",
+          "shortfallQuantity",
+          "sourceKind"
         ],
         "type": "object"
       },
@@ -14753,6 +14835,34 @@
         },
         "summary": "Fail a market movement"
       }
+    },
+    "/api/v1/admin/market-movements/{movementId}/health": {
+      "get": {
+        "operationId": "getMarketMovementHealth",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketMovementHealth"
+                }
+              }
+            },
+            "description": "Success"
+          }
+        },
+        "summary": "Read current FIFO backing for a market movement"
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "movementId",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/v1/admin/market-movements/{movementId}/reconcile": {
       "parameters": [

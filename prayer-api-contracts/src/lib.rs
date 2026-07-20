@@ -1247,6 +1247,33 @@ pub struct RuntimeInventoryMovementsResponse {
     pub movements: Vec<RuntimeInventoryMovementDto>,
 }
 
+/// FIFO backing allocated to one market-depth claim in a movement.
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeInventoryClaimHealthDto {
+    pub source_kind: String,
+    pub location_id: String,
+    pub item_id: String,
+    pub requested_quantity: i64,
+    pub backed_quantity: i64,
+    pub shortfall_quantity: i64,
+}
+
+/// Current backing health for one inventory-backed market movement.
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeInventoryMovementHealthDto {
+    #[schemars(with = "String")]
+    pub movement_id: Uuid,
+    pub status: RuntimeInventoryMovementStatusDto,
+    pub active: bool,
+    pub fully_backed: bool,
+    pub requested_quantity: i64,
+    pub backed_quantity: i64,
+    pub shortfall_quantity: i64,
+    pub claims: Vec<RuntimeInventoryClaimHealthDto>,
+}
+
 /// Planning-only faction-storage craft goal.
 pub type RuntimeVirtualCraftOrderDto = prayer_runtime::knowledge::VirtualCraftOrder;
 

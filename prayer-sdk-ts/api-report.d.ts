@@ -464,7 +464,7 @@ export type * from "./generated/types.js";
 // generated/api.d.ts
 import type { RequestOptions } from "../transport.js";
 import { Transport } from "../transport.js";
-import type { ActionOverrideRequest, ActionRunRequest, ActionRunResponse, BotList, BotSummary, CancelRequest, CraftReservationResponse, MarketMovement, MarketMovementList, MarketMovementReserveRequest, MarketMovementReserveResponse, MarketMovementTransitionRequest, Meta, OverrideResponse, QueueLane, QueueResponse, RegisterBotRequest, RegisterBotResponse, ReservationRequest, ReservationResponse, RouteBatchRequest, RouteBatchResponse, ScriptOverrideRequest, ScriptRunRequest, ScriptRunResponse, StateResponse, VirtualCraftOrderList, VirtualCraftOrderWrite, VirtualOrderList, VirtualOrderWrite } from "./types.js";
+import type { ActionOverrideRequest, ActionRunRequest, ActionRunResponse, BotList, BotSummary, CancelRequest, CraftReservationResponse, MarketMovement, MarketMovementHealth, MarketMovementList, MarketMovementReserveRequest, MarketMovementReserveResponse, MarketMovementTransitionRequest, Meta, OverrideResponse, QueueLane, QueueResponse, RegisterBotRequest, RegisterBotResponse, ReservationRequest, ReservationResponse, RouteBatchRequest, RouteBatchResponse, ScriptOverrideRequest, ScriptRunRequest, ScriptRunResponse, StateResponse, VirtualCraftOrderList, VirtualCraftOrderWrite, VirtualOrderList, VirtualOrderWrite } from "./types.js";
 export declare class PrayerApi {
     private readonly transport;
     constructor(transport: Transport);
@@ -472,6 +472,7 @@ export declare class PrayerApi {
     reserveMarketMovement(body: MarketMovementReserveRequest, idempotencyKey: string, options?: RequestOptions): Promise<MarketMovementReserveResponse>;
     completeMarketMovement(movementId: string, idempotencyKey: string, options?: RequestOptions): Promise<MarketMovement>;
     failMarketMovement(movementId: string, idempotencyKey: string, options?: RequestOptions): Promise<MarketMovement>;
+    getMarketMovementHealth(movementId: string, options?: RequestOptions): Promise<MarketMovementHealth>;
     reconcileMarketMovement(movementId: string, body: MarketMovementTransitionRequest, idempotencyKey: string, options?: RequestOptions): Promise<MarketMovement>;
     releaseMarketMovement(movementId: string, idempotencyKey: string, options?: RequestOptions): Promise<MarketMovement>;
     startMarketMovement(movementId: string, idempotencyKey: string, options?: RequestOptions): Promise<MarketMovement>;
@@ -1944,6 +1945,16 @@ export interface MarketMovement {
     "updatedAtUnix": number;
     "virtualOrderUses": Array<ReservationUse>;
 }
+export interface MarketMovementHealth {
+    "active": boolean;
+    "backedQuantity": number;
+    "claims": Array<RuntimeInventoryClaimHealthDto>;
+    "fullyBacked": boolean;
+    "movementId": string;
+    "requestedQuantity": number;
+    "shortfallQuantity": number;
+    "status": MarketMovementStatus;
+}
 export interface MarketMovementList {
     "movements": Array<MarketMovement>;
 }
@@ -2343,6 +2354,14 @@ export interface RuntimeGalaxySystemInfoDto {
     "wildlife": Array<unknown>;
     "x"?: number | null;
     "y"?: number | null;
+}
+export interface RuntimeInventoryClaimHealthDto {
+    "backedQuantity": number;
+    "itemId": string;
+    "locationId": string;
+    "requestedQuantity": number;
+    "shortfallQuantity": number;
+    "sourceKind": string;
 }
 export interface RuntimePoiResourceInfoDto {
     "name": string;

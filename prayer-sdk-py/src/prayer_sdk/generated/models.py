@@ -1720,6 +1720,16 @@ class MarketMovement(WireModel):
     updated_at_unix: int = Field(..., alias='updatedAtUnix')
     virtual_order_uses: tuple[ReservationUse, ...] = Field(..., alias='virtualOrderUses')
 
+class MarketMovementHealth(WireModel):
+    active: bool = Field(...)
+    backed_quantity: int = Field(..., alias='backedQuantity')
+    claims: tuple[RuntimeInventoryClaimHealthDto, ...] = Field(...)
+    fully_backed: bool = Field(..., alias='fullyBacked')
+    movement_id: str = Field(..., alias='movementId')
+    requested_quantity: int = Field(..., alias='requestedQuantity')
+    shortfall_quantity: int = Field(..., alias='shortfallQuantity')
+    status: MarketMovementStatus = Field(...)
+
 class MarketMovementList(WireModel):
     movements: tuple[MarketMovement, ...] = Field(...)
 
@@ -2127,6 +2137,14 @@ class RuntimeGalaxySystemInfoDto(WireModel):
     wildlife: tuple[Any, ...] = Field(...)
     x: float | None = Field(None)
     y: float | None = Field(None)
+
+class RuntimeInventoryClaimHealthDto(WireModel):
+    backed_quantity: int = Field(..., alias='backedQuantity')
+    item_id: str = Field(..., alias='itemId')
+    location_id: str = Field(..., alias='locationId')
+    requested_quantity: int = Field(..., alias='requestedQuantity')
+    shortfall_quantity: int = Field(..., alias='shortfallQuantity')
+    source_kind: str = Field(..., alias='sourceKind')
 
 class RuntimePoiResourceInfoDto(WireModel):
     name: str = Field(...)
@@ -3068,6 +3086,7 @@ JobView.model_rebuild()
 LaneOwner.model_rebuild()
 LootedModule.model_rebuild()
 MarketMovement.model_rebuild()
+MarketMovementHealth.model_rebuild()
 MarketMovementList.model_rebuild()
 MarketMovementReserveRequest.model_rebuild()
 MarketMovementReserveResponse.model_rebuild()
@@ -3114,6 +3133,7 @@ RouteSelection.model_rebuild()
 RuntimeGalaxyKnownPoiInfoDto.model_rebuild()
 RuntimeGalaxyPoiInfoDto.model_rebuild()
 RuntimeGalaxySystemInfoDto.model_rebuild()
+RuntimeInventoryClaimHealthDto.model_rebuild()
 RuntimePoiResourceInfoDto.model_rebuild()
 RuntimeVirtualOrderReservationResultDto.model_rebuild()
 RuntimeWildlifeCreatureDto.model_rebuild()

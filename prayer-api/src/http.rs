@@ -85,6 +85,10 @@ pub fn build_v1_resource_router(administration: Arc<PrayerAdministration>) -> Ro
             post(reserve_inventory_movement),
         )
         .route(
+            "/api/v1/admin/market-movements/:id/health",
+            get(inventory_movement_health),
+        )
+        .route(
             "/api/v1/admin/market-movements/:id/start",
             post(start_inventory_movement),
         )
@@ -219,6 +223,21 @@ async fn list_inventory_movements(
     State(administration): State<Arc<PrayerAdministration>>,
 ) -> Json<prayer_api_contracts::RuntimeInventoryMovementsResponse> {
     Json(administration.inventory_movements())
+}
+
+async fn inventory_movement_health(
+    State(administration): State<Arc<PrayerAdministration>>,
+    Path(id): Path<String>,
+) -> Result<
+    Json<prayer_api_contracts::RuntimeInventoryMovementHealthDto>,
+    (StatusCode, Json<ErrorBody>),
+> {
+    let id = Uuid::parse_str(&id)
+        .map_err(|_| map_api_error(ApiError::BadRequest(format!("invalid movement id '{id}'"))))?;
+    administration
+        .inventory_movement_health(id)
+        .map(Json)
+        .map_err(map_api_error)
 }
 
 async fn reserve_inventory_movement(

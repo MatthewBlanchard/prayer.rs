@@ -110,12 +110,19 @@ pub struct InventoryReservationOutcome {
 pub struct InventoryReservationLedger {
     movements: HashMap<Uuid, InventoryMovement>,
     reserved_by_key: HashMap<String, i64>,
+    reservation_order: HashMap<Uuid, u64>,
+    next_reservation_order: u64,
 }
 
 impl InventoryReservationLedger {
     pub fn movements(&self) -> Vec<InventoryMovement> {
         let mut movements = self.movements.values().cloned().collect::<Vec<_>>();
-        movements.sort_by_key(|movement| (movement.created_at_unix, movement.movement_id));
+        movements.sort_by_key(|movement| {
+            self.reservation_order
+                .get(&movement.movement_id)
+                .copied()
+                .unwrap_or(u64::MAX)
+        });
         movements
     }
 
@@ -194,6 +201,9 @@ impl InventoryReservationLedger {
             };
             self.movements
                 .insert(movement.movement_id, movement.clone());
+            self.reservation_order
+                .insert(movement.movement_id, self.next_reservation_order);
+            self.next_reservation_order = self.next_reservation_order.saturating_add(1);
             InventoryReservationOutcome {
                 accepted: true,
                 movement: Some(movement),

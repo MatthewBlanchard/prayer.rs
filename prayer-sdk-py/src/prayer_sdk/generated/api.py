@@ -29,6 +29,11 @@ class PrayerApi:
         query = None
         return await self._transport.request('POST', path, query=query, json=None, headers={'Idempotency-Key': idempotency_key}, options=options)
 
+    async def get_market_movement_health(self, movement_id: Any, options: RequestOptions | None = None) -> Any:
+        path = 'api/v1/admin/market-movements/{movement_id}/health'.format(movement_id=quote(str(movement_id), safe=''))
+        query = None
+        return await self._transport.request('GET', path, query=query, json=None, headers={}, options=options)
+
     async def reconcile_market_movement(self, movement_id: Any, body: Any, idempotency_key: Any, options: RequestOptions | None = None) -> Any:
         path = 'api/v1/admin/market-movements/{movement_id}/reconcile'.format(movement_id=quote(str(movement_id), safe=''))
         query = None

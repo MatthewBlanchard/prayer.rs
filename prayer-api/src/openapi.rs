@@ -121,6 +121,7 @@ pub fn openapi_v1() -> Value {
     paths.insert("/api/v1/admin/virtual-craft-orders/{orderId}/reservation".into(), json!({"delete":request_operation("releaseVirtualCraftOrder", "Release a virtual craft reservation", "EmptyRequest", "VirtualCraftOrderList", errors.clone(), true)}));
     paths.insert("/api/v1/admin/market-movements".into(), json!({"get":operation("listMarketMovements", "List market movements", "MarketMovementList")}));
     paths.insert("/api/v1/admin/market-movements/reservations".into(), json!({"post":request_operation("reserveMarketMovement", "Reserve a market movement", "MarketMovementReserveRequest", "MarketMovementReserveResponse", errors.clone(), true)}));
+    paths.insert("/api/v1/admin/market-movements/{movementId}/health".into(), json!({"get":operation("getMarketMovementHealth", "Read current FIFO backing for a market movement", "MarketMovementHealth")}));
     for (suffix, id, summary) in [
         ("start", "startMarketMovement", "Start a market movement"),
         (
@@ -330,6 +331,10 @@ fn schemas() -> Value {
         &mut schemas,
         "MarketMovementList",
     );
+    insert_schema::<prayer_api_contracts::RuntimeInventoryMovementHealthDto>(
+        &mut schemas,
+        "MarketMovementHealth",
+    );
     Value::Object(schemas)
 }
 
@@ -440,7 +445,7 @@ mod tests {
     fn schema_is_openapi_31_and_covers_every_v1_route() {
         let schema = openapi_v1();
         assert_eq!(schema["openapi"], "3.1.0");
-        assert_eq!(schema["paths"].as_object().unwrap().len(), 33);
+        assert_eq!(schema["paths"].as_object().unwrap().len(), 34);
     }
 
     #[test]

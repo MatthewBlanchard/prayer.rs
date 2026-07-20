@@ -739,6 +739,20 @@ impl RuntimeService {
         }
     }
 
+    pub fn inventory_movement_health(
+        &self,
+        movement_id: Uuid,
+    ) -> Result<crate::RuntimeInventoryMovementHealthDto, SdkError> {
+        let movements = self.inventory_reservations.lock().movements();
+        let market = prayer_runtime::MarketData {
+            station_markets: self.knowledge_state.read().station_markets.clone(),
+            ..prayer_runtime::MarketData::default()
+        };
+        market_movement_health(&movements, &market, movement_id).ok_or_else(|| {
+            SdkError::BadRequest(format!("unknown inventory movement '{movement_id}'"))
+        })
+    }
+
     pub async fn transition_inventory_movement(
         &self,
         movement_id: Uuid,
@@ -800,6 +814,117 @@ impl RuntimeService {
                 ))
             })
     }
+}
+
+fn market_movement_health(
+    movements: &[RuntimeInventoryMovementDto],
+    market: &MarketData,
+    movement_id: Uuid,
+) -> Option<crate::RuntimeInventoryMovementHealthDto> {
+    use crate::{RuntimeInventoryClaimHealthDto, RuntimeInventoryMovementStatusDto as Status};
+    use std::collections::HashMap;
+
+    let target = movements
+        .iter()
+        .find(|movement| movement.movement_id == movement_id)?;
+    let is_active = |status: Status| {
+        matches!(
+            status,
+            Status::Reserved | Status::Running | Status::NeedsReconciliation
+        )
+    };
+    let compound = |claim: &RuntimeInventoryClaimDto| {
+        format!(
+            "{}|{}|{}",
+            claim.source_kind, claim.location_id, claim.item_id
+        )
+    };
+
+    // Health deliberately starts from raw observations. The public world projection has
+    // active reservations removed and therefore cannot show whether they remain backed.
+    let mut remaining = HashMap::<String, i64>::new();
+    for (station, snapshot) in &market.station_markets {
+        for (item, orders) in &snapshot.sell_orders {
+            let quantity = orders
+                .iter()
+                .filter(|order| {
+                    !order
+                        .source
+                        .as_deref()
+                        .is_some_and(|source| source.starts_with("virtual_faction:"))
+                })
+                .map(|order| order.quantity.max(0))
+                .sum();
+            remaining.insert(format!("market|{station}|{item}"), quantity);
+        }
+        for (item, orders) in &snapshot.buy_orders {
+            let quantity = orders
+                .iter()
+                .filter(|order| {
+                    !order
+                        .source
+                        .as_deref()
+                        .is_some_and(|source| source.starts_with("virtual_faction:"))
+                })
+                .map(|order| order.quantity.max(0))
+                .sum();
+            remaining.insert(format!("market_bid|{station}|{item}"), quantity);
+        }
+    }
+
+    let mut allocations = HashMap::<(Uuid, usize), i64>::new();
+    // The ledger returns movements in exact reservation order, including reservations
+    // accepted within the same second. Allocate current depth in that FIFO order.
+    for movement in movements
+        .iter()
+        .filter(|movement| is_active(movement.status))
+    {
+        for (index, claim) in movement.claims.iter().enumerate() {
+            if !matches!(claim.source_kind.as_str(), "market" | "market_bid") {
+                continue;
+            }
+            let available = remaining.entry(compound(claim)).or_default();
+            let backed = claim.quantity.max(0).min(*available);
+            *available = available.saturating_sub(backed);
+            allocations.insert((movement.movement_id, index), backed);
+        }
+    }
+
+    let active = is_active(target.status);
+    let claims = target
+        .claims
+        .iter()
+        .enumerate()
+        .filter(|(_, claim)| matches!(claim.source_kind.as_str(), "market" | "market_bid"))
+        .map(|(index, claim)| {
+            let requested = claim.quantity.max(0);
+            let backed = allocations
+                .get(&(target.movement_id, index))
+                .copied()
+                .unwrap_or(0);
+            RuntimeInventoryClaimHealthDto {
+                source_kind: claim.source_kind.clone(),
+                location_id: claim.location_id.clone(),
+                item_id: claim.item_id.clone(),
+                requested_quantity: requested,
+                backed_quantity: backed,
+                shortfall_quantity: requested.saturating_sub(backed),
+            }
+        })
+        .collect::<Vec<_>>();
+    let requested_quantity: i64 = claims.iter().map(|claim| claim.requested_quantity).sum();
+    let backed_quantity: i64 = claims.iter().map(|claim| claim.backed_quantity).sum();
+    let shortfall_quantity = requested_quantity.saturating_sub(backed_quantity);
+    Some(crate::RuntimeInventoryMovementHealthDto {
+        movement_id,
+        status: target.status,
+        active,
+        fully_backed: active && shortfall_quantity == 0,
+        requested_quantity,
+        backed_quantity,
+        shortfall_quantity,
+        claims,
+    })
 }
 
 fn canonical_poi_for_actor(actor: &BotState, galaxy: &GalaxyData, value: &str) -> Option<String> {
@@ -1573,5 +1698,69 @@ mod tests {
             released.station_markets["poi-station"].buy_orders["ore"][0].quantity,
             5
         );
+    }
+
+    #[test]
+    fn movement_health_allocates_dropped_depth_fifo() {
+        let claim = |quantity| RuntimeInventoryClaimDto {
+            lot_id: Some("market_bid|market|poi-station|power_cell".into()),
+            source_kind: "market_bid".into(),
+            owner_id: "market".into(),
+            location_id: "poi-station".into(),
+            item_id: "power_cell".into(),
+            quantity,
+        };
+        let movement = |id, created_at_unix, quantity| RuntimeInventoryMovementDto {
+            movement_id: Uuid::from_u128(id),
+            session_id: Uuid::nil(),
+            kind: "sale".into(),
+            status: RuntimeInventoryMovementStatusDto::Reserved,
+            claims: vec![claim(quantity)],
+            virtual_order_uses: Vec::new(),
+            context: serde_json::Value::Null,
+            created_at_unix,
+            updated_at_unix: created_at_unix,
+        };
+        let first = movement(1, 10, 100);
+        let second = movement(2, 20, 50);
+        let market = MarketData {
+            station_markets: HashMap::from([(
+                "poi-station".into(),
+                prayer_state::StationMarketData {
+                    buy_orders: HashMap::from([(
+                        "power_cell".into(),
+                        vec![prayer_state::MarketOrder {
+                            price_each: 5,
+                            quantity: 77,
+                            source: None,
+                            my_quantity: None,
+                        }],
+                    )]),
+                    ..Default::default()
+                },
+            )]),
+            ..Default::default()
+        };
+
+        let movements = vec![first.clone(), second.clone()];
+        let first_health = market_movement_health(&movements, &market, first.movement_id).unwrap();
+        let second_health =
+            market_movement_health(&movements, &market, second.movement_id).unwrap();
+        assert_eq!(
+            (
+                first_health.backed_quantity,
+                first_health.requested_quantity
+            ),
+            (77, 100)
+        );
+        assert_eq!(
+            (
+                second_health.backed_quantity,
+                second_health.requested_quantity
+            ),
+            (0, 50)
+        );
+        assert!(!first_health.fully_backed);
+        assert!(!second_health.fully_backed);
     }
 }

@@ -30,6 +30,13 @@ impl PrayerAdministration {
         self.service.inventory_movements()
     }
 
+    pub fn inventory_movement_health(
+        &self,
+        id: Uuid,
+    ) -> Result<RuntimeInventoryMovementHealthDto, SdkError> {
+        self.service.inventory_movement_health(id)
+    }
+
     pub async fn reserve_inventory_movement(
         &self,
         request: RuntimeInventoryMovementReserveRequest,
