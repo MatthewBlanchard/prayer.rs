@@ -470,6 +470,8 @@ export type GalaxyMapData = {
     x: number | null;
     y: number | null;
     hasBase?: boolean;
+    baseId?: string | null;
+    baseName?: string | null;
     firstDiscoveredUnix?: number | null;
     lastObservedUnix?: number | null;
     firstVisitedUnix?: number | null;

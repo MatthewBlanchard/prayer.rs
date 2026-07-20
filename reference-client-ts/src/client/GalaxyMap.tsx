@@ -1769,7 +1769,7 @@ function GalaxyMapViewportComponent({
             />
             <div ref={systemPoiLabelsRef} className="system-map-poi-labels" aria-hidden="true">
               {systemMapPois.map((poi) => (
-                <span key={poi.id}>{poi.name || poi.id}</span>
+                <span key={poi.id}>{poi.baseName || poi.name || poi.id}</span>
               ))}
             </div>
             <div className="system-map-center-label">{selectedSystemStar?.name || selectedSystemStar?.id || systemLabel(selectedSystem)}</div>

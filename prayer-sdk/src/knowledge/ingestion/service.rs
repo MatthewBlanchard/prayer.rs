@@ -389,6 +389,61 @@ impl RuntimeService {
             .await;
         let commands = account.commands().spacemolt();
         let current_system = projected.bot.location.system_id.clone();
+        let current_poi = projected.bot.location.poi_id.clone();
+        let needs_poi_hydration = current_poi.as_deref().is_some_and(|poi_id| {
+            !self
+                .knowledge_state
+                .read()
+                .galaxy
+                .poi_records
+                .get(poi_id)
+                .is_some_and(|poi| poi.info_complete && !poi.info.name.trim().is_empty())
+        });
+        if needs_poi_hydration {
+            match commands.get_poi().await {
+                Ok(response) => match response.into_value() {
+                    Ok(value) => {
+                        if let Some(galaxy) =
+                            crate::spacemolt_projection::project_get_poi_json(&value)
+                        {
+                            self.ingest_observations(
+                                [StateObservation {
+                                    world: prayer_runtime::snapshot::WorldObservation {
+                                        galaxy: Arc::new(galaxy),
+                                        ..Default::default()
+                                    },
+                                    ..Default::default()
+                                }],
+                                "canonical current-POI hydration",
+                            );
+                            info!(
+                                id = %id,
+                                poi_id = current_poi.as_deref().unwrap_or("(none)"),
+                                "canonical current POI hydrated"
+                            );
+                        } else {
+                            warn!(
+                                id = %id,
+                                poi_id = current_poi.as_deref().unwrap_or("(none)"),
+                                "get_poi returned no projectable galaxy facts"
+                            );
+                        }
+                    }
+                    Err(err) => warn!(
+                        id = %id,
+                        poi_id = current_poi.as_deref().unwrap_or("(none)"),
+                        error = %err,
+                        "get_poi response could not be serialized for observation ingestion"
+                    ),
+                },
+                Err(err) => warn!(
+                    id = %id,
+                    poi_id = current_poi.as_deref().unwrap_or("(none)"),
+                    error = %err,
+                    "canonical current-POI hydration failed"
+                ),
+            }
+        }
         let needs_system_scan = current_system.as_deref().is_some_and(|system_id| {
             !self
                 .knowledge_state

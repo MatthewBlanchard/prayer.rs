@@ -338,7 +338,7 @@ pub fn project_get_poi_galaxy(
     project_get_poi_json(&value)
 }
 
-fn project_get_poi_json(value: &serde_json::Value) -> Option<GalaxyData> {
+pub(crate) fn project_get_poi_json(value: &serde_json::Value) -> Option<GalaxyData> {
     let payload = value.get("result").unwrap_or(value);
     let poi = payload.get("poi").unwrap_or(payload);
     let system_id = poi
@@ -347,6 +347,26 @@ fn project_get_poi_json(value: &serde_json::Value) -> Option<GalaxyData> {
         .as_str()?;
     let observed_at = observation_unix();
     let mut record = poi_record_from_json(system_id, poi, observed_at, false)?;
+    if let Some(base) = payload.get("base").filter(|base| base.is_object()) {
+        if let Some(base_id) = base
+            .get("id")
+            .and_then(serde_json::Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+        {
+            record.info.has_base = true;
+            record.info.base_id = Some(base_id.to_string());
+        }
+        if let Some(base_name) = base
+            .get("name")
+            .and_then(serde_json::Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+        {
+            record.info.base_name = Some(base_name.to_string());
+            if record.info.name.trim().is_empty() || record.info.name == record.id {
+                record.info.name = base_name.to_string();
+            }
+        }
+    }
     let resources = payload.get("resources").or_else(|| poi.get("resources"));
     record.resources = resources_from_json(resources);
     record.resources_complete = true;
@@ -1201,6 +1221,32 @@ mod tests {
         assert_eq!(
             poi[0].world.galaxy.poi_records["belt_1"].resources[0].resource_id,
             "iron_ore"
+        );
+
+        let station = project_get_poi_json(&serde_json::json!({
+            "poi": {
+                "id": "9d742eadce7c211220fa20ba10093462",
+                "name": "",
+                "system_id": "blackthorn",
+                "type": "station",
+                "description": "",
+                "position": { "x": 1.0, "y": 2.0 }
+            },
+            "base": {
+                "id": "566fbb2d3a304fa2d846147aed2aec0c",
+                "name": "Blackthorn Exchange"
+            }
+        }))
+        .expect("station POI with separate base details");
+        let station = &station.poi_records["9d742eadce7c211220fa20ba10093462"];
+        assert_eq!(station.info.name, "Blackthorn Exchange");
+        assert_eq!(
+            station.info.base_name.as_deref(),
+            Some("Blackthorn Exchange")
+        );
+        assert_eq!(
+            station.info.base_id.as_deref(),
+            Some("566fbb2d3a304fa2d846147aed2aec0c")
         );
 
         let details: serde_json::Value =
