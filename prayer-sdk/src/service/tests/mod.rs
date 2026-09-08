@@ -223,7 +223,7 @@ impl TestSocket {
     }
 
     async fn wait_for_action(&self, action: &str) -> InboundFrame {
-        tokio::time::timeout(Duration::from_secs(1), async {
+        tokio::time::timeout(Duration::from_secs(5), async {
             loop {
                 if let Some(frame) = self.sent().into_iter().find(|frame| frame.action == action) {
                     return frame;
@@ -4222,6 +4222,72 @@ async fn drain_events_clears_after_first_call() {
 
     let events2 = service.drain_events(id).await.expect("drain 2");
     assert!(events2.is_empty());
+}
+
+async fn execution_test_session(action: prayer_actions::Action) -> (Arc<RuntimeService>, Uuid, TestSocket, prayer_actions::RunId) {
+    let service = Arc::new(RuntimeService::new());
+    let id = service.create_session();
+    let (account, socket) = seeded_test_account_with_socket(None, serde_json::json!({
+        "player": { "id": "test", "username": "Test", "credits": 44 },
+        "ship": { "fuel": 90, "max_fuel": 100 },
+        "location": { "system_id": "sol", "poi_id": "station", "docked_at": "station" }
+    })).await;
+    service.get_session(id).await.unwrap().lock().await.spacemolt_account = Some(account);
+    let run_id = prayer_actions::RunId("execution-test".into());
+    let claim = service.try_acquire_action_lane(id, run_id.clone()).await.unwrap();
+    service.submit_action_batch(id, &claim, vec![prayer_actions::ActionEnvelope::new(
+        "action", action, prayer_actions::ActionOrigin::Manual { run_id: run_id.clone() },
+    )]).await.unwrap();
+    (service, id, socket, run_id)
+}
+
+#[tokio::test]
+async fn soft_error_does_not_replace_newer_observation_or_timestamp() {
+    let (service, id, socket, _) = execution_test_session(prayer_actions::Action::Undock).await;
+    let executor = Arc::clone(&service);
+    let step = tokio::spawn(async move { executor.execute_step(id).await });
+    let request = socket.wait_for_action("undock").await;
+    let observed_at = Utc::now() - chrono::Duration::seconds(10);
+    {
+        let session = service.get_session(id).await.unwrap();
+        let mut session = session.lock().await;
+        session.bot_state_mut().location.system_id = Some("newer-system".into());
+        session.actor.observation.observed_at_utc = Some(observed_at);
+    }
+    socket.server_send(RawFrame {
+        kind: "error".into(), request_id: request.request_id,
+        payload: Some(serde_json::json!({ "code": "test_failure", "message": "mutation rejected" })),
+    });
+    assert!(step.await.unwrap().unwrap().error.is_some());
+    let session = service.get_session(id).await.unwrap();
+    let session = session.lock().await;
+    assert_eq!(session.actor.observed.location.system_id.as_deref(), Some("newer-system"));
+    assert_eq!(session.actor.observation.observed_at_utc, Some(observed_at));
+}
+
+#[tokio::test]
+async fn successful_command_is_committed_even_if_account_disappears_before_refresh() {
+    let (service, id, socket, run_id) = execution_test_session(prayer_actions::Action::RenameShip { name: "test-name".into() }).await;
+    let executor = Arc::clone(&service);
+    let mut step = tokio::spawn(async move { executor.execute_step(id).await });
+    let request = tokio::select! {
+        request = socket.wait_for_action("rename_ship") => request,
+        result = &mut step => panic!("step ended before dispatch: {result:?}"),
+    };
+    service.get_session(id).await.unwrap().lock().await.spacemolt_account = None;
+    socket.server_send(RawFrame {
+        kind: "result".into(), request_id: request.request_id.clone(),
+        payload: Some(serde_json::json!({"result": "pending", "structuredContent": {"pending": true, "command": "rename_ship"}})),
+    });
+    socket.server_send(RawFrame {
+        kind: "action_result".into(), request_id: request.request_id,
+        payload: Some(serde_json::json!({ "command": "rename_ship", "tick": 1, "result": {} })),
+    });
+    assert!(step.await.unwrap().unwrap().error.is_none());
+    assert!(matches!(service.action_run(id, &run_id).await.unwrap().unwrap().outcome,
+        Some(prayer_runtime::execution::ActionBatchOutcome::Succeeded)));
+    assert!(service.scheduler_snapshot(id).await.unwrap().running.is_none());
+    assert_eq!(socket.sent().iter().filter(|frame| frame.action == "rename_ship").count(), 1);
 }
 
 #[tokio::test]

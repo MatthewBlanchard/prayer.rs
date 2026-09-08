@@ -29,6 +29,14 @@ impl RuntimeService {
         id: Uuid,
         mut halt_rx: Option<&mut watch::Receiver<bool>>,
     ) -> Result<StepResponse, SdkError> {
+        // Serialize complete steps, including I/O, without blocking observations
+        // or cancellation on the session mutex.
+        let execution_lock = {
+            let session = self.get_session(id).await?;
+            let session = session.lock().await;
+            Arc::clone(&session.execution_lock)
+        };
+        let _execution_guard = execution_lock.lock().await;
         // Phase 1a: brief lock to check whether a state prefetch is needed.
         let should_prefetch = {
             let session = self.get_session(id).await?;
@@ -59,7 +67,7 @@ impl RuntimeService {
         // Phase 1c: apply prefetched state, then decide the next command.
         self.refresh_managed_players_knowledge().await;
 
-        let (command, current_state, active_command, mining_blacklist) = {
+        let (command, token, current_state, active_command, mining_blacklist) = {
             let session = self.get_session(id).await?;
             let mut session = session.lock().await;
             drop(prefetched_state);
@@ -110,7 +118,9 @@ impl RuntimeService {
 
             let active_command = session.engine.active_command_state();
             let mining_blacklist = std::collections::HashSet::new();
-            (command, current_state, active_command, mining_blacklist)
+            let token = session.engine.execution_token().ok_or_else(||
+                SdkError::InvalidRuntimeState("selected command has no execution owner".into()))?;
+            (command, token, current_state, active_command, mining_blacklist)
         }; // lock released — snapshot reads can proceed during command I/O
 
         // Phase 2: plan and execute the command tick without holding the
@@ -140,6 +150,13 @@ impl RuntimeService {
         let tick_result: Result<EngineExecutionResult, OperationFailure> = 'tick: {
             let mut last: Option<ApiOutcome> = None;
             loop {
+                {
+                    let session = self.get_session(id).await?;
+                    let session = session.lock().await;
+                    if !session.engine.owns_execution(&token) {
+                        return Ok(halted_step_response());
+                    }
+                }
                 let read_context = prayer_runtime::read_context::RuntimeReadContext::from_execution(
                     plan_state.context(),
                     &command.action,
@@ -403,8 +420,9 @@ impl RuntimeService {
                     match await_with_halt(&mut halt_rx, self.refresh_state_for_host_loop(id, true))
                         .await
                     {
-                        Ok(result) => {
-                            result?;
+                        Ok(Ok(_)) => {}
+                        Ok(Err(error)) => {
+                            warn!(%id, %error, "post-command refresh failed; preserving command outcome");
                         }
                         Err(()) => return Ok(halted_step_response()),
                     }
@@ -434,6 +452,9 @@ impl RuntimeService {
         // Phase 3: re-acquire lock, apply results.
         let session = self.get_session(id).await?;
         let mut session = session.lock().await;
+        if !session.engine.owns_execution(&token) {
+            return Ok(halted_step_response());
+        }
         if mission_refresh_forced {}
         let command_text = if command.args.is_empty() {
             command.action.clone()
@@ -443,7 +464,7 @@ impl RuntimeService {
         let restoration_step = session.engine.scheduler_snapshot().interrupt.as_ref().is_some_and(|running| {
             matches!(&running.envelope.origin, prayer_actions::ActionOrigin::Interrupt { policy } if policy == "client_return_to_origin_ready")
         });
-        let (result, mut state_after, refreshed, message, step_error) = match outcome {
+        let (result, mut state_after, _refreshed, message, step_error) = match outcome {
             CommandOutcome::Success {
                 result,
                 state_after,
@@ -479,6 +500,7 @@ impl RuntimeService {
                 )
             }
         };
+        state_after.bot = Arc::clone(&session.actor.observed);
         if let Some(message) = craft_enqueue_message.as_deref() {
             preserve_craft_enqueue_as_queue(Arc::make_mut(&mut state_after.bot), message);
         }
@@ -501,22 +523,12 @@ impl RuntimeService {
         Arc::make_mut(&mut state_after.bot).last_mined = Arc::new(mine_deltas);
         Arc::make_mut(&mut state_after.bot).last_stored = Arc::new(storage_deltas);
 
-        {
-            let knowledge = self.knowledge_state.snapshot();
-            session.actor.observed = Arc::clone(&state_after.bot);
-            session.actor.observation.observed_at_utc = Some(Utc::now());
-            session.knowledge_version = knowledge.knowledge_version;
-            session.has_state = true;
-            if refreshed {
-                session.last_state_refresh_completed_at = Some(Instant::now());
-            }
-        }
-        session
-            .engine
-            .set_active_command_state(planner.continuation());
-        session
-            .engine
-            .execute_result(&command, result.clone(), state_after.context());
+        // Only derived execution fields are changed here. Ingestion owns the
+        // observed facts, observation timestamp, and refresh completion time.
+        session.actor.observed = Arc::clone(&state_after.bot);
+        session.engine.execute_result_for(
+            &token, &command, planner.continuation(), result.clone(), state_after.context(),
+        );
         session.push_status(format!(
             "{command_text} - {}",
             message.clone().unwrap_or_else(|| "done".to_string())
