@@ -66,6 +66,8 @@ struct WorldDomainVersions {
 
 #[derive(Clone, Serialize, Deserialize)]
 struct IdempotencyRecord {
+    #[serde(default)]
+    pending: bool,
     fingerprint: String,
     run_id: RunId,
 }
@@ -123,6 +125,8 @@ impl IdempotencyStore {
 
 #[derive(Serialize, Deserialize)]
 struct PersistedIdempotencyRecord {
+    #[serde(default)]
+    pending: bool,
     bot_id: String,
     key: String,
     kind: String,
@@ -280,6 +284,7 @@ pub enum V1Error {
     Sdk(SdkError),
     Validation(String),
     IdempotencyConflict,
+    AdmissionUncertain,
     Internal(String),
     Unauthorized,
 }
@@ -305,6 +310,13 @@ impl IntoResponse for V1Error {
                 StatusCode::CONFLICT,
                 "idempotency_conflict",
                 "idempotency key was reused with a different request".into(),
+                false,
+                None,
+            ),
+            Self::AdmissionUncertain => (
+                StatusCode::CONFLICT,
+                "admission_uncertain",
+                "this request has an unresolved durable admission intent; inspect the bot's runs before submitting replacement work".into(),
                 false,
                 None,
             ),
@@ -540,6 +552,7 @@ fn load_idempotency(
             Some((
                 (record.bot_id, record.key, kind),
                 IdempotencyRecord {
+                    pending: record.pending,
                     fingerprint: record.fingerprint,
                     run_id: record.run_id,
                 },
@@ -555,6 +568,7 @@ fn persist_idempotency(
     let mut records = index
         .iter()
         .map(|((bot_id, key, kind), record)| PersistedIdempotencyRecord {
+            pending: record.pending,
             bot_id: bot_id.clone(),
             key: key.clone(),
             kind: (*kind).into(),
@@ -573,7 +587,15 @@ fn persist_idempotency(
             .map_err(|error| V1Error::Internal(error.to_string()))?,
     )
     .map_err(|error| V1Error::Internal(error.to_string()))?;
-    std::fs::rename(temp, path).map_err(|error| V1Error::Internal(error.to_string()))
+    std::fs::File::open(&temp).and_then(|file| file.sync_all())
+        .map_err(|error| V1Error::Internal(error.to_string()))?;
+    std::fs::rename(temp, path).map_err(|error| V1Error::Internal(error.to_string()))?;
+    #[cfg(unix)]
+    if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
+        std::fs::File::open(parent).and_then(|file| file.sync_all())
+            .map_err(|error| V1Error::Internal(error.to_string()))?;
+    }
+    Ok(())
 }
 
 async fn meta() -> Json<V1MetaResponse> {
@@ -1054,6 +1076,7 @@ async fn start_action_run(
             if existing.fingerprint != fingerprint {
                 return Err(V1Error::IdempotencyConflict);
             }
+            if existing.pending { return Err(V1Error::AdmissionUncertain); }
             let bot = state.sdk.bot(bot_id).await?;
             let run = bot.action_run(existing.run_id).await?;
             return Ok((
@@ -1068,6 +1091,13 @@ async fn start_action_run(
         .map(Action::try_from)
         .collect::<Result<Vec<_>, _>>()?;
     let bot = state.sdk.bot(bot_id.clone()).await?;
+    if let Some(key) = idempotency_key.as_ref() {
+        state.idempotency.insert_and_persist(key.clone(), IdempotencyRecord {
+            pending: true,
+            fingerprint: fingerprint.clone(),
+            run_id: RunId(Uuid::new_v4().to_string()),
+        }).await?;
+    }
     let run = bot.start_actions(actions).await?;
     if let Some(key) = idempotency_key {
         state
@@ -1075,6 +1105,7 @@ async fn start_action_run(
             .insert_and_persist(
                 key,
                 IdempotencyRecord {
+                    pending: false,
                     fingerprint,
                     run_id: run.id().clone(),
                 },
@@ -1226,6 +1257,7 @@ async fn start_script_run(
             if existing.fingerprint != fingerprint {
                 return Err(V1Error::IdempotencyConflict);
             }
+            if existing.pending { return Err(V1Error::AdmissionUncertain); }
             let bot = state.sdk.bot(bot_id).await?;
             let run = bot.script_run(existing.run_id).await?;
             return Ok((
@@ -1235,6 +1267,13 @@ async fn start_script_run(
         }
     }
     let bot = state.sdk.bot(bot_id.clone()).await?;
+    if let Some(key) = idempotency_key.as_ref() {
+        state.idempotency.insert_and_persist(key.clone(), IdempotencyRecord {
+            pending: true,
+            fingerprint: fingerprint.clone(),
+            run_id: RunId(Uuid::new_v4().to_string()),
+        }).await?;
+    }
     let run = bot.start_script(request.script).await?;
     if let Some(key) = idempotency_key {
         state
@@ -1242,6 +1281,7 @@ async fn start_script_run(
             .insert_and_persist(
                 key,
                 IdempotencyRecord {
+                    pending: false,
                     fingerprint,
                     run_id: run.id().clone(),
                 },
@@ -1618,6 +1658,7 @@ mod tests {
         index.insert(
             ("bot".into(), "key".into(), "action"),
             IdempotencyRecord {
+                    pending: false,
                 fingerprint: "digest".into(),
                 run_id: RunId("run".into()),
             },
@@ -1694,6 +1735,7 @@ mod tests {
                     .insert_and_persist(
                         (format!("bot-{index}"), format!("key-{index}"), "script"),
                         IdempotencyRecord {
+                    pending: false,
                             fingerprint: format!("fingerprint-{index}"),
                             run_id: RunId(format!("run-{index}")),
                         },
@@ -1718,4 +1760,29 @@ mod tests {
         assert!(!production.contains("spacemolt_client"));
         assert!(!production.contains(".service()"));
     }
+    #[tokio::test]
+    async fn pending_admission_survives_restart_and_rejects_replay_before_sdk_submission() {
+        let path = std::env::temp_dir().join(format!("prayer-admission-{}.json", Uuid::new_v4()));
+        let actions = vec![V1ActionRequest(Action::Wait { ticks: 1 })];
+        let fingerprint = serde_json::to_string(&actions).unwrap();
+        let store = IdempotencyStore::new(path.clone());
+        store.insert_and_persist(("bot-1".into(), "key".into(), "action"), IdempotencyRecord {
+            pending: true, fingerprint, run_id: RunId("unresolved".into()),
+        }).await.unwrap();
+        let sdk = test_sdk().await;
+        let state = V1State {
+            sdk: Arc::clone(&sdk), idempotency: IdempotencyStore::new(path.clone()),
+            world_history: Default::default(), world_domains: Default::default(),
+        };
+        // Build through the contract's real serialization rather than guessing enum casing.
+        let value = json!({"actions": actions, "idempotencyKey": "key"});
+        let request: V1ActionRunRequest = serde_json::from_value(value).unwrap();
+        let mut headers = HeaderMap::new();
+        headers.insert("idempotency-key", "key".parse().unwrap());
+        let result = start_action_run(State(state), Path("bot-1".into()), headers, Ok(Json(request))).await;
+        assert!(matches!(result, Err(V1Error::AdmissionUncertain)));
+        assert!(sdk.bot("bot-1").await.unwrap().queue().await.unwrap().owner.is_none());
+        std::fs::remove_file(path).unwrap();
+    }
+
 }

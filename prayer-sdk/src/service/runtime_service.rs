@@ -613,6 +613,7 @@ pub struct RuntimeService {
     inventory_reservation_gate: ParkingMutex<()>,
     knowledge_persistence: KnowledgePersistence,
     session_state_path: PathBuf,
+    session_persistence_gate: Mutex<()>,
     persistence_telemetry: Arc<PersistenceTelemetry>,
     account_state_tx: tokio::sync::mpsc::UnboundedSender<Uuid>,
     account_state_rx: ParkingMutex<Option<tokio::sync::mpsc::UnboundedReceiver<Uuid>>>,
@@ -696,6 +697,7 @@ impl RuntimeService {
             inventory_reservation_gate: ParkingMutex::new(()),
             knowledge_persistence,
             session_state_path,
+            session_persistence_gate: Mutex::new(()),
             persistence_telemetry,
             account_state_tx,
             account_state_rx: ParkingMutex::new(Some(account_state_rx)),
@@ -745,6 +747,20 @@ impl RuntimeService {
 
     /// Create service instance.
     pub fn new() -> Self {
+        #[cfg(test)]
+        {
+            // Service tests must never read or write the operator's session store.
+            let root = PathBuf::from("/tmp").join(format!("prayer-service-test-{}", Uuid::new_v4()));
+            let options = RuntimeServiceOptions {
+                knowledge_state_path: root.join("knowledge.json"),
+                session_state_path: root.join("sessions.json"),
+                ..RuntimeServiceOptions::default()
+            };
+            return Self::with_spacemolt_client(
+                Arc::new(SpacemoltClient::default()), DEFAULT_SPACEMOLT_ORIGIN.into(), options,
+            );
+        }
+        #[cfg(not(test))]
         Self::default()
     }
 

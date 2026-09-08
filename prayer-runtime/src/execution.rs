@@ -23,13 +23,16 @@ pub struct ExecutionSnapshot {
 }
 
 /// Current persisted execution-run schema.
-pub const EXECUTION_RUN_SCHEMA_VERSION: u32 = 2;
+pub const EXECUTION_RUN_SCHEMA_VERSION: u32 = 3;
 
 /// Scheduler state and producer state are persisted independently so restore
 /// never needs to infer queue lifecycle from source frames.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PersistedExecutionRun {
     pub schema_version: u32,
+    /// A mutation was durably prepared but its command outcome was not committed.
+    #[serde(default)]
+    pub pending_dispatch: Option<String>,
     pub scheduler: SchedulerCheckpoint,
     pub producer: PersistedProducer,
     #[serde(default)]
@@ -199,6 +202,7 @@ mod tests {
             })
             .expect("claim");
         let run = PersistedExecutionRun {
+            pending_dispatch: None,
             schema_version: EXECUTION_RUN_SCHEMA_VERSION,
             scheduler: scheduler.checkpoint(),
             producer: PersistedProducer::Manual(ManualRunCheckpoint {

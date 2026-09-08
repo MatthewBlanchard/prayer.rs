@@ -88,6 +88,18 @@ let outcome = run.wait().await?;
 Runs can be inspected, awaited, reattached by ID, or cancelled. Prayer
 executes their actions through a durable, exclusive lane for that bot.
 
+Submissions become visible to execution only after their session checkpoint is
+saved. Before each upstream mutation, Prayer saves a dispatch intent. If the
+process restarts with an unresolved intent, it stops that run with an
+`upstream outcome unknown` reason instead of replaying the mutation. Inspect
+live state before submitting replacement work; this is conservative recovery,
+not an exactly-once guarantee.
+
+The HTTP API saves an idempotency intent before starting keyed work. A retry
+whose admission was interrupted returns `409 admission_uncertain`; inspect the
+bot's runs before choosing a new request key. Completed admission records retain
+their run IDs for normal retry/reattachment behavior.
+
 ### PrayerLang
 
 PrayerLang is a strictly linear list of commands. Clients resolve dynamic

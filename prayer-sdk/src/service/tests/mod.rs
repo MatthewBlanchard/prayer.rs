@@ -4274,6 +4274,8 @@ async fn successful_command_is_committed_even_if_account_disappears_before_refre
         request = socket.wait_for_action("rename_ship") => request,
         result = &mut step => panic!("step ended before dispatch: {result:?}"),
     };
+    let on_disk = super::load_runtime_sessions(&service.session_state_path).unwrap();
+    assert!(on_disk[0].execution.as_ref().unwrap().pending_dispatch.is_some());
     service.get_session(id).await.unwrap().lock().await.spacemolt_account = None;
     socket.server_send(RawFrame {
         kind: "result".into(), request_id: request.request_id.clone(),
@@ -4287,5 +4289,76 @@ async fn successful_command_is_committed_even_if_account_disappears_before_refre
     assert!(matches!(service.action_run(id, &run_id).await.unwrap().unwrap().outcome,
         Some(prayer_runtime::execution::ActionBatchOutcome::Succeeded)));
     assert!(service.scheduler_snapshot(id).await.unwrap().running.is_none());
+    let committed = super::load_runtime_sessions(&service.session_state_path).unwrap();
+    assert!(committed[0].execution.as_ref().unwrap().pending_dispatch.is_none());
     assert_eq!(socket.sent().iter().filter(|frame| frame.action == "rename_ship").count(), 1);
+}
+
+#[tokio::test]
+async fn failed_durable_admission_does_not_publish_action_or_script_work() {
+    let mut service = RuntimeService::new();
+    let id = service.create_session();
+    let root = std::path::PathBuf::from("/tmp").join(format!("prayer-admission-failure-{}", Uuid::new_v4()));
+    std::fs::create_dir_all(&root).unwrap();
+    let blocker = root.join("not-a-directory");
+    std::fs::write(&blocker, b"block").unwrap();
+    service.session_state_path = blocker.join("sessions.json");
+    assert!(service.try_acquire_action_lane(id, prayer_actions::RunId("rejected".into())).await.is_err());
+    assert!(service.scheduler_snapshot(id).await.unwrap().claim.is_none());
+    assert!(service.set_script(id, "go alpha;".into()).await.is_err());
+    assert!(service.snapshot(id).await.unwrap().script.is_empty());
+    assert!(service.scheduler_snapshot(id).await.unwrap().claim.is_none());
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[tokio::test]
+async fn failed_batch_commit_retains_the_previous_durable_claim_without_queueing_work() {
+    let mut service = RuntimeService::new();
+    let id = service.create_session();
+    let run_id = prayer_actions::RunId("durable-claim".into());
+    let claim = service.try_acquire_action_lane(id, run_id.clone()).await.unwrap();
+    let path = service.session_state_path.clone();
+    service.session_state_path = path.join("invalid-child");
+    assert!(service.submit_action_batch(id, &claim, vec![prayer_actions::ActionEnvelope::new(
+        "rejected", prayer_actions::Action::Wait { ticks: 1 },
+        prayer_actions::ActionOrigin::Manual { run_id },
+    )]).await.is_err());
+    let scheduler = service.scheduler_snapshot(id).await.unwrap();
+    assert_eq!(scheduler.claim, Some(claim));
+    assert!(scheduler.pending.is_empty());
+    let records = super::load_runtime_sessions(&path).unwrap();
+    assert!(records[0].execution.as_ref().unwrap().scheduler.pending.is_empty());
+}
+
+#[tokio::test]
+async fn concurrent_session_commits_preserve_every_accepted_queue() {
+    let service = Arc::new(RuntimeService::new());
+    let mut tasks = Vec::new();
+    for index in 0..8 {
+        let id = service.create_session();
+        let service = Arc::clone(&service);
+        tasks.push(tokio::spawn(async move {
+            let run_id = prayer_actions::RunId(format!("run-{index}"));
+            let claim = service.try_acquire_action_lane(id, run_id.clone()).await.unwrap();
+            service.submit_action_batch(id, &claim, vec![prayer_actions::ActionEnvelope::new(
+                format!("action-{index}"), prayer_actions::Action::Wait { ticks: 1 },
+                prayer_actions::ActionOrigin::Manual { run_id },
+            )]).await.unwrap();
+        }));
+    }
+    for task in tasks { task.await.unwrap(); }
+    let records = super::load_runtime_sessions(&service.session_state_path).unwrap();
+    assert_eq!(records.len(), 8);
+    for record in records { assert_eq!(record.execution.unwrap().scheduler.pending.len(), 1); }
+}
+
+#[tokio::test]
+async fn dispatch_is_not_sent_when_its_intent_cannot_be_persisted() {
+    let (mut service, id, socket, run_id) = execution_test_session(prayer_actions::Action::RenameShip { name: "test".into() }).await;
+    let service_mut = Arc::get_mut(&mut service).expect("sole service owner");
+    service_mut.session_state_path = service_mut.session_state_path.join("invalid-child");
+    assert!(service.execute_script_with_wait_policy(id, true).await.is_err());
+    assert!(matches!(service.action_run(id, &run_id).await.unwrap().unwrap().outcome,
+        Some(prayer_runtime::execution::ActionBatchOutcome::Failed { .. })));
+    assert_eq!(socket.sent().iter().filter(|frame| frame.action == "rename_ship").count(), 0);
 }
