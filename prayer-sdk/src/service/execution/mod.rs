@@ -195,6 +195,12 @@ impl RuntimeService {
                             payload = %payload_preview,
                             "command lowered to upstream api call"
                         );
+                        if definition.kind == spacemolt_lib_rs::actions::ActionKind::Mutation {
+                            self.commit_session(id, |session| {
+                                session.engine.prepare_dispatch(&token, &action)?;
+                                Ok(())
+                            }).await?;
+                        }
                         let started = Instant::now();
                         let api_result = match await_with_halt(&mut halt_rx, async {
                             let account = self.spacemolt_account(id).await?;
@@ -568,7 +574,7 @@ impl RuntimeService {
             error: step_error,
         };
         drop(session);
-        self.persist_sessions("after script step").await;
+        self.persist_sessions_checked().await?;
         Ok(response)
     }
 
@@ -624,7 +630,12 @@ impl RuntimeService {
                     error = Some(msg);
                     break;
                 }
-                Err(err) => return Err(err),
+                Err(err) => {
+                    let session = self.get_session(id).await?;
+                    session.lock().await.engine.fail_action_run(err.to_string())?;
+                    self.persist_sessions("after execution host failure").await;
+                    return Err(err);
+                }
             };
             if !step.executed {
                 debug!(

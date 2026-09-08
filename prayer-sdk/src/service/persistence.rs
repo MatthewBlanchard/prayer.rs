@@ -819,61 +819,88 @@ pub fn save_runtime_sessions(
     };
     let bytes = serde_json::to_vec_pretty(&payload).map_err(io::Error::other)?;
     let tmp = path.with_extension("tmp");
-    fs::write(&tmp, bytes)?;
+    {
+        let mut file = fs::File::create(&tmp)?;
+        io::Write::write_all(&mut file, &bytes)?;
+        file.sync_all()?;
+    }
     fs::rename(tmp, path)?;
+    #[cfg(unix)]
+    if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
+        fs::File::open(parent)?.sync_all()?;
+    }
     Ok(())
 }
 
+fn session_record(id: Uuid, session: &SessionHandle) -> Result<PersistedRuntimeSession, SdkError> {
+    Ok(PersistedRuntimeSession {
+        id,
+        label: session.label.clone(),
+        bot_id: session.bot_id.as_ref().map(ToString::to_string),
+        created_utc: session.created_utc,
+        last_updated_utc: session.last_updated_utc,
+        execution: Some(session.engine.execution_checkpoint()?),
+        script_execution: session.script_execution.clone(),
+        current_control_input: session.current_control_input.clone(),
+        status_lines: session.status_lines.clone(),
+        spacemolt_account_selector: session.spacemolt_account_selector.clone(),
+        spacemolt_base_url: session.spacemolt_base_url.clone(),
+    })
+}
+
 impl RuntimeService {
-    pub async fn persisted_session_records(&self) -> Vec<PersistedRuntimeSession> {
-        let entries: Vec<(Uuid, Arc<Mutex<SessionHandle>>)> = self
-            .sessions
-            .read()
-            .iter()
-            .map(|(id, session)| (*id, session.clone()))
-            .collect();
+    pub async fn persisted_session_records(&self) -> Result<Vec<PersistedRuntimeSession>, SdkError> {
+        let entries: Vec<_> = self.sessions.read().iter()
+            .map(|(id, session)| (*id, Arc::clone(session))).collect();
         let mut out = Vec::with_capacity(entries.len());
         for (id, session) in entries {
-            let session = session.lock().await;
-            out.push(PersistedRuntimeSession {
-                id,
-                label: session.label.clone(),
-                bot_id: session.bot_id.as_ref().map(ToString::to_string),
-                created_utc: session.created_utc,
-                last_updated_utc: session.last_updated_utc,
-                execution: Some(match session.engine.execution_checkpoint() {
-                    Ok(execution) => execution,
-                    Err(error) => {
-                        warn!(session_id = %id, %error, "skipping session with invalid execution checkpoint");
-                        continue;
-                    }
-                }),
-                script_execution: session.script_execution.clone(),
-                current_control_input: session.current_control_input.clone(),
-                status_lines: session.status_lines.clone(),
-                spacemolt_account_selector: session.spacemolt_account_selector.clone(),
-                spacemolt_base_url: session.spacemolt_base_url.clone(),
-            });
+            out.push(session_record(id, &*session.lock().await)?);
         }
-        out.sort_by(|a, b| a.created_utc.cmp(&b.created_utc));
-        out
+        out.sort_by_key(|record| record.created_utc);
+        Ok(out)
+    }
+
+    async fn write_session_records(&self, records: Vec<PersistedRuntimeSession>) -> Result<(), SdkError> {
+        let path = self.session_state_path.clone();
+        let result = tokio::task::spawn_blocking(move || save_runtime_sessions(&path, records))
+            .await.map_err(|error| SdkError::InvalidRuntimeState(error.to_string()))?
+            .map_err(|error| SdkError::InvalidRuntimeState(error.to_string()));
+        if result.is_err() {
+            self.persistence_telemetry.save_failures.fetch_add(1, Ordering::Relaxed);
+        }
+        result
+    }
+
+    /// Stage a change under the session lock and publish it only after durable commit.
+    /// All snapshot writers share this gate, so older snapshots cannot overwrite it.
+    pub async fn commit_session<T>(
+        &self,
+        id: Uuid,
+        update: impl FnOnce(&mut SessionHandle) -> Result<T, SdkError>,
+    ) -> Result<T, SdkError> {
+        let _persistence = self.session_persistence_gate.lock().await;
+        let mut records = self.persisted_session_records().await?;
+        let handle = self.get_session(id).await?;
+        let mut session = handle.lock().await;
+        let mut staged = session.clone();
+        let result = update(&mut staged)?;
+        let record = session_record(id, &staged)?;
+        records.retain(|record| record.id != id);
+        records.push(record);
+        self.write_session_records(records).await?;
+        *session = staged;
+        self.note_session_changed(id);
+        Ok(result)
+    }
+
+    pub async fn persist_sessions_checked(&self) -> Result<(), SdkError> {
+        let _persistence = self.session_persistence_gate.lock().await;
+        self.write_session_records(self.persisted_session_records().await?).await
     }
 
     pub async fn persist_sessions(&self, context: &'static str) {
-        let records = self.persisted_session_records().await;
-        if let Err(err) = save_runtime_sessions(&self.session_state_path, records) {
-            let failures = self
-                .persistence_telemetry
-                .save_failures
-                .fetch_add(1, Ordering::Relaxed)
-                + 1;
-            warn!(
-                path = %self.session_state_path.display(),
-                failures,
-                error = %err,
-                context,
-                "runtime session store save failed"
-            );
+        if let Err(error) = self.persist_sessions_checked().await {
+            warn!(%error, context, "runtime session store save failed");
         }
     }
 

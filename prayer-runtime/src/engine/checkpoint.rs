@@ -62,6 +62,7 @@ impl RuntimeEngine {
             })
             .transpose()?;
         Ok(PersistedExecutionRun {
+            pending_dispatch: self.pending_dispatch.clone(),
             schema_version: EXECUTION_RUN_SCHEMA_VERSION,
             scheduler,
             producer: if let Some(action_run) = &self.action_run {
@@ -89,12 +90,15 @@ impl RuntimeEngine {
         &mut self,
         run: PersistedExecutionRun,
     ) -> Result<(), EngineError> {
-        if run.schema_version != EXECUTION_RUN_SCHEMA_VERSION {
+        // Read pre-intent checkpoints, but write v3 so older executors reject
+        // checkpoints whose unresolved dispatch must not be replayed.
+        if run.schema_version != EXECUTION_RUN_SCHEMA_VERSION && run.schema_version != 2 {
             return Err(EngineError::InvalidState(format!(
                 "execution checkpoint schema {} is incompatible with linear PrayerLang schema {}; legacy condition, skill, and policy frames cannot be resumed",
                 run.schema_version, EXECUTION_RUN_SCHEMA_VERSION
             )));
         }
+        self.pending_dispatch = run.pending_dispatch.clone();
         let scheduler_checkpoint = run.scheduler.clone();
         let scheduler = prayer_scheduler::Scheduler::from_checkpoint(scheduler_checkpoint.clone())
             .map_err(|error| EngineError::InvalidState(error.to_string()))?;
@@ -108,6 +112,7 @@ impl RuntimeEngine {
             self.scheduler = scheduler;
             self.queue_claim = producer.claim;
             self.action_run = run.action_run;
+            self.stop_uncertain_restored_dispatch();
             return Ok(());
         }
         let PersistedProducer::PrayerLang(producer) = run.producer else {
@@ -144,6 +149,7 @@ impl RuntimeEngine {
                 frame.active_command = Some(state);
             }
         }
+        self.stop_uncertain_restored_dispatch();
         Ok(())
     }
 

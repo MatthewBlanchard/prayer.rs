@@ -357,12 +357,14 @@ impl Default for PrayerLangRun {
 }
 
 /// Runtime integration around one PrayerLang producer and one scheduler.
+#[derive(Clone)]
 pub struct RuntimeEngine {
     producer: PrayerLangRun,
     scheduler: Scheduler,
     queue_claim: Option<QueueClaim>,
     action_sequence: u64,
     action_run: Option<PersistedActionRun>,
+    pending_dispatch: Option<String>,
     events: Vec<RuntimeEvent>,
 }
 
@@ -404,6 +406,7 @@ impl RuntimeEngine {
             queue_claim: None,
             action_sequence: 0,
             action_run: None,
+            pending_dispatch: None,
             events: Vec::new(),
         }
     }
@@ -449,6 +452,9 @@ impl RuntimeEngine {
 
     /// Decide next command from AST walker. Returns `None` when halted or script complete.
     pub fn decide_next(&mut self, state: ExecutionReadContext<'_>) -> Result<Option<ResolvedAction>, EngineError> {
+        if let Some(reason) = &self.pending_dispatch {
+            return Err(EngineError::InvalidState(reason.clone()));
+        }
         if self.producer.is_halted {
             return Ok(None);
         }
@@ -569,6 +575,26 @@ impl RuntimeEngine {
     }
 
     /// Submit command execution result back into runtime.
+    pub fn prepare_dispatch(&mut self, token: &ExecutionToken, action: &str) -> Result<(), EngineError> {
+        if !self.owns_execution(token) {
+            return Err(EngineError::InvalidState("dispatch owner changed".into()));
+        }
+        self.pending_dispatch = Some(format!(
+            "upstream outcome unknown for {action} (action {}); inspect live state before submitting replacement work",
+            token.envelope.id.0,
+        ));
+        Ok(())
+    }
+
+    fn stop_uncertain_restored_dispatch(&mut self) {
+        if let Some(reason) = self.pending_dispatch.take() {
+            if let Some(run) = self.action_run.as_mut().filter(|run| run.outcome.is_none()) {
+                run.outcome = Some(ActionBatchOutcome::Halted { reason: reason.clone() });
+            }
+            self.halt(&reason);
+        }
+    }
+
     pub fn execution_token(&self) -> Option<ExecutionToken> {
         let snapshot = self.scheduler.snapshot();
         let (lane, running) = match snapshot.interrupt {
@@ -600,6 +626,7 @@ impl RuntimeEngine {
         }
         self.set_active_command_state(continuation);
         self.execute_result(command, result, state);
+        self.pending_dispatch = None;
         true
     }
 

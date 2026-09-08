@@ -2,6 +2,7 @@ use super::knowledge::*;
 use super::persistence::*;
 use super::*;
 
+#[derive(Clone)]
 pub struct SessionHandle {
     pub bot_id: Option<BotId>,
     pub label: String,
@@ -434,7 +435,21 @@ impl RuntimeService {
                 "discarding persisted session without an atomic execution checkpoint".into(),
             )
         })?;
+        let recovery_reason = execution.pending_dispatch.clone();
         session.engine.restore_execution_checkpoint(execution)?;
+        if let Some(reason) = recovery_reason {
+            session.push_status(reason.clone());
+            if let Some(script) = session.script_execution.as_mut() {
+                script.state = ScriptExecutionStateDto::Stopped {
+                    current_line: None,
+                    last_line: None,
+                    outcome: ScriptOutcomeDto::Error {
+                        kind: ScriptErrorKindDto::Runtime,
+                        message: reason,
+                    },
+                };
+            }
+        }
 
         if !session.engine.snapshot().script.trim().is_empty() {
             session.engine.reanalyze_current_script(None)?;
@@ -781,7 +796,7 @@ impl RuntimeService {
             let result = self
                 .execute_script_with_wait_policy(id, poll_across_waits)
                 .await;
-            if run_guard.action_generation.is_some()
+            if result.is_ok() && run_guard.action_generation.is_some()
                 && self.action_runner_should_continue(&mut run_guard).await
             {
                 continue;
@@ -1025,9 +1040,9 @@ impl RuntimeService {
             )));
         }
         let mut refreshed_after_stale_identity = false;
-        let normalized = loop {
-            let session = self.get_session(id).await?;
-            let mut session = session.lock().await;
+        loop {
+            let mut stale_identity = false;
+            let result = self.commit_session(id, |session| {
             if let Some(claim) = session.engine.normal_lane_claim() {
                 if matches!(
                     claim.owner,
@@ -1054,26 +1069,23 @@ impl RuntimeService {
                         world: &world,
                         runtime: &runtime,
                     });
-            let normalized = match session.engine.set_script(&script, state_snapshot) {
-                Ok(normalized) => normalized,
-                Err(err)
-                    if !refreshed_after_stale_identity
-                        && script_error_may_be_stale_identity(&err) =>
-                {
-                    drop(session);
+                let normalized = session.engine.set_script(&script, state_snapshot).map_err(|error| {
+                    stale_identity = script_error_may_be_stale_identity(&error);
+                    SdkError::from(error)
+                })?;
+                session.current_control_input = Some(script.clone());
+                session.push_status("Script loaded and activated");
+                session.last_updated_utc = Utc::now();
+                Ok(normalized)
+            }).await;
+            match result {
+                Err(_) if !refreshed_after_stale_identity && stale_identity => {
                     self.refresh_state(id).await?;
                     refreshed_after_stale_identity = true;
-                    continue;
                 }
-                Err(err) => return Err(err.into()),
-            };
-            session.current_control_input = Some(script);
-            session.push_status("Script loaded and activated");
-            session.last_updated_utc = Utc::now();
-            break normalized;
-        };
-        self.persist_sessions("after script update").await;
-        Ok(normalized)
+                result => return result,
+            }
+        }
     }
 
     pub async fn engine_snapshot_response(
@@ -1449,19 +1461,16 @@ impl RuntimeService {
         run_id: prayer_actions::RunId,
     ) -> Result<prayer_scheduler::QueueClaim, SdkError> {
         self.archive_current_action_run(id).await;
-        let session = self.get_session(id).await?;
-        let mut session = session.lock().await;
-        if let Some(claim) = session.engine.normal_lane_claim() {
-            return Err(SdkError::LaneBusy {
-                run_id: queue_owner_run_id(&claim.owner),
-                owner: (&claim.owner).into(),
-                generation: claim.generation,
-            });
-        }
-        let claim = session.engine.try_acquire_action_run(run_id)?;
-        drop(session);
-        self.persist_sessions("after action lane acquisition").await;
-        Ok(claim)
+        self.commit_session(id, |session| {
+            if let Some(claim) = session.engine.normal_lane_claim() {
+                return Err(SdkError::LaneBusy {
+                    run_id: queue_owner_run_id(&claim.owner),
+                    owner: (&claim.owner).into(),
+                    generation: claim.generation,
+                });
+            }
+            Ok(session.engine.try_acquire_action_run(run_id)?)
+        }).await
     }
 
     pub async fn submit_action_batch(
@@ -1470,14 +1479,10 @@ impl RuntimeService {
         claim: &prayer_scheduler::QueueClaim,
         actions: Vec<prayer_actions::ActionEnvelope>,
     ) -> Result<(), SdkError> {
-        let session = self.get_session(id).await?;
-        session
-            .lock()
-            .await
-            .engine
-            .submit_action_batch(claim, actions)?;
-        self.persist_sessions("after action batch submission").await;
-        Ok(())
+        self.commit_session(id, |session| {
+            session.engine.submit_action_batch(claim, actions)?;
+            Ok(())
+        }).await
     }
 
     pub async fn submit_action_override(
@@ -1518,8 +1523,7 @@ impl RuntimeService {
                 )
             })
             .collect();
-        let session = self.get_session(id).await?;
-        let mut session = session.lock().await;
+        self.commit_session(id, |session| {
         if session.engine.override_lane_busy() {
             let snapshot = session.engine.scheduler_snapshot();
             let active = snapshot
@@ -1535,9 +1539,8 @@ impl RuntimeService {
             });
         }
         session.engine.submit_action_override(envelopes)?;
-        drop(session);
-        self.persist_sessions("after action override submission")
-            .await;
+            Ok(())
+        }).await?;
         let service = Arc::clone(self);
         self.spawn_background(async move {
             let _ = service.start_script_runner(id, "sdk override lane").await;
