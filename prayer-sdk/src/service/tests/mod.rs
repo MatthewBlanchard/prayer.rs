@@ -4223,3 +4223,32 @@ async fn drain_events_clears_after_first_call() {
     let events2 = service.drain_events(id).await.expect("drain 2");
     assert!(events2.is_empty());
 }
+
+#[tokio::test]
+async fn script_cancellation_rejects_stale_identity_without_touching_replacement() {
+    let service = RuntimeService::new();
+    let id = service.create_session();
+    service.set_script(id, "go alpha;".into()).await.unwrap();
+    let first_guard = service.begin_script_run(id, "test").await.unwrap();
+    let first_id = service.script_execution(id).await.unwrap().unwrap().run_id.unwrap();
+    service.cancel_script_run(id, &first_id, "finish first".into()).await.unwrap();
+    drop(first_guard);
+
+    service.set_script(id, "go beta;".into()).await.unwrap();
+    let _second_guard = service.begin_script_run(id, "test").await.unwrap();
+    let second = service.script_execution(id).await.unwrap().unwrap();
+    let second_id = second.run_id.unwrap();
+    let halt_rx = service.script_halt_receiver(id).await.unwrap();
+    assert_ne!(first_id, second_id);
+    assert!(matches!(
+        service.cancel_script_run(id, &first_id, "stale cancel".into()).await,
+        Err(crate::SdkError::RunNotFound { .. })
+    ));
+    assert!(!*halt_rx.borrow());
+    assert!(matches!(service.script_execution(id).await.unwrap().unwrap().state,
+        crate::ScriptExecutionStateDto::Running { .. }));
+    assert!(service.snapshot(id).await.unwrap().script.contains("beta"));
+    let outcome = service.cancel_script_run(id, &second_id, "stop second".into()).await.unwrap();
+    let repeated = service.cancel_script_run(id, &second_id, "different reason".into()).await.unwrap();
+    assert_eq!(serde_json::to_value(outcome).unwrap(), serde_json::to_value(repeated).unwrap());
+}

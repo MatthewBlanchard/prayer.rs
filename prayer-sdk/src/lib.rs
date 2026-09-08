@@ -1432,9 +1432,9 @@ impl ScriptRunHandle {
 
     pub async fn cancel(&self, reason: impl Into<String>) -> Result<ScriptRunOutcome, SdkError> {
         self.service
-            .cancel_script_run(self.session_id.into_uuid(), reason.into())
-            .await?;
-        self.wait().await
+            .cancel_script_run(self.session_id.into_uuid(), &self.run_id, reason.into())
+            .await
+            .map(Into::into)
     }
 }
 
