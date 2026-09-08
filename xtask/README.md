@@ -4,7 +4,7 @@ The `xtask` crate is Prayer's cross-platform workspace task runner. Invoke it
 from the repository root as `cargo xtask <command>`; it changes to the workspace
 root before doing any work.
 
-Rust 1.78 or newer, Node.js 22 or newer, and npm 10 or 11 must be available on
+Rust 1.98.1 or newer, Node.js 22 or newer, and npm 10 or 11 must be available on
 `PATH` for every command.
 
 ## Commands
