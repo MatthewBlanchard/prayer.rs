@@ -442,7 +442,8 @@ impl RuntimeService {
         // Typed-action queues own their runner lifecycle independently of the
         // legacy PrayerLang producer flags. If scheduler work survived a
         // restart, it must always cause a runner to be restored.
-        let should_kick = session.engine.has_unfinished_action_run()
+        let should_kick = session.engine.override_lane_busy()
+            || session.engine.has_unfinished_action_run()
             || (!snapshot.is_halted && !snapshot.is_finished);
         info!(
             id = %record.id,
@@ -723,7 +724,8 @@ impl RuntimeService {
             Err(_) => return false,
         };
         let session = session.lock().await;
-        let scheduler_has_work = session.engine.has_unfinished_action_run();
+        let scheduler_has_work = session.engine.has_unfinished_action_run()
+            || session.engine.override_lane_busy();
         let mut active_runs = guard.active_script_runs.lock();
         let Some(active) = active_runs.get(&guard.id) else {
             guard.released = true;
