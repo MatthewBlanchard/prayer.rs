@@ -1632,27 +1632,37 @@ impl RuntimeService {
         Ok(execution)
     }
 
-    pub async fn cancel_script_run(&self, id: Uuid, reason: String) -> Result<(), SdkError> {
+    pub async fn cancel_script_run(
+        &self,
+        id: Uuid,
+        run_id: &prayer_actions::RunId,
+        reason: String,
+    ) -> Result<ScriptOutcomeDto, SdkError> {
         let session = self.get_session(id).await?;
         let mut session = session.lock().await;
+        let execution = session.script_execution.as_ref()
+            .filter(|execution| execution.run_id.as_ref() == Some(run_id))
+            .ok_or_else(|| SdkError::RunNotFound { run_id: run_id.clone() })?;
+        if let ScriptExecutionStateDto::Stopped { outcome, .. } = &execution.state {
+            return Ok(outcome.clone());
+        }
         let last_line = session.engine.snapshot().current_script_line;
         session.engine.halt(&reason);
-        let execution = session
-            .script_execution
-            .as_mut()
-            .ok_or_else(|| SdkError::BadRequest("script run not found".into()))?;
-        execution.state = ScriptExecutionStateDto::Stopped {
-            current_line: None,
-            last_line,
-            outcome: ScriptOutcomeDto::Error {
-                kind: ScriptErrorKindDto::Cancelled,
-                message: reason,
-            },
+        let outcome = ScriptOutcomeDto::Error {
+            kind: ScriptErrorKindDto::Cancelled,
+            message: reason,
         };
-        drop(session);
+        session.script_execution.as_mut().expect("validated execution").state =
+            ScriptExecutionStateDto::Stopped {
+                current_line: None,
+                last_line,
+                outcome: outcome.clone(),
+            };
+        // Signal the matching runner before releasing the session to replacement work.
         self.notify_script_halt(id).await;
+        drop(session);
         self.persist_sessions("after script run cancellation").await;
-        Ok(())
+        Ok(outcome)
     }
 
     /// Restore checkpoint.

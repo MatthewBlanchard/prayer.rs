@@ -178,7 +178,7 @@ same bot, action, run, and state contracts available to other applications.
 
 ## Prerequisites and bootstrap
 
-Prayer supports Rust 1.78 or newer and Node.js 22 or newer with npm 10 or 11. Install
+Prayer supports Rust 1.98.1 or newer and Node.js 22 or newer with npm 10 or 11. Install
 Xcode Command Line Tools on macOS; a C compiler, linker, `pkg-config`, and
 TLS/build packages on Linux; or the Rust MSVC toolchain and Visual Studio C++
 Build Tools on native Windows. WSL is an optional fallback, not a requirement.
