@@ -137,7 +137,8 @@ mod tests {
 
     #[test]
     fn service_has_no_runtime_transport_field() {
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent().expect("repo").join("prayer-sdk/src");
         let service = rust_sources_under(&root.join("service"));
         assert!(!service.contains("transport: Arc<dyn RuntimeTransport>"));
         assert!(!service.contains("SpaceMoltTransport"));
@@ -219,12 +220,12 @@ mod tests {
     }
 
     #[test]
-    fn mcp_workflows_do_not_own_cross_bot_assignment_truth() {
+    fn consumer_workflows_do_not_own_cross_bot_assignment_truth() {
         let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .parent()
             .expect("repo");
         let workflows = rust_sources_under_any_extension(
-            &repo.join("reference-client-ts/src/server/scoped-mcp/workflows"),
+            &repo.join("reference-client-ts/src/server"),
             "ts",
         );
         for forbidden in [

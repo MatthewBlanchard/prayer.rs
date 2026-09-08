@@ -251,7 +251,7 @@ mod tests {
     }
 
     #[test]
-    fn execution_checkpoint_excludes_override_lane_and_resumes_normal_work() {
+    fn execution_checkpoint_preserves_override_before_resuming_normal_work() {
         let mut engine = RuntimeEngine::new();
         submit_wait_action(&mut engine, 3);
         let normal = engine
@@ -274,10 +274,10 @@ mod tests {
         assert_eq!(override_action.action, "wait");
 
         let checkpoint = engine.execution_checkpoint().expect("checkpoint");
-        assert!(checkpoint.scheduler.interrupt.is_none());
+        assert!(checkpoint.scheduler.interrupt.is_some());
         assert!(checkpoint.scheduler.interrupt_pending.is_empty());
         assert!(
-            !checkpoint
+            checkpoint
                 .scheduler
                 .running
                 .as_ref()
@@ -289,7 +289,10 @@ mod tests {
         restored
             .restore_execution_checkpoint(checkpoint)
             .expect("restore");
-        assert!(!restored.override_lane_busy());
+        assert!(restored.override_lane_busy());
+        let pending = restored.decide_next(ExecutionReadContext::default()).unwrap().unwrap();
+        assert_eq!(pending, override_action);
+        restored.execute_result(&pending, EngineExecutionResult::default(), ExecutionReadContext::default());
         let resumed = restored
             .decide_next(ExecutionReadContext::default())
             .expect("decide resumed")
