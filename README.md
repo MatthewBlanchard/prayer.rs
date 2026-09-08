@@ -127,7 +127,8 @@ bot.execute_action_override(
 
 `execute_script_override` accepts the same kind of linear PrayerLang plan.
 Set `return_to_origin` to opt into a best-effort return before normal work
-resumes; it defaults to `false`.
+resumes; it defaults to `false`. Accepted override actions and their continuations
+are checkpointed with normal work and resume before the normal lane after restart.
 
 ## Inspect live state
 

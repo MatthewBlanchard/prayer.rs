@@ -43,12 +43,9 @@ pub struct RuntimeActiveFrameSnapshot {
 impl RuntimeEngine {
     /// Persist scheduler, producer, and continuation as one atomic envelope.
     pub fn execution_checkpoint(&self) -> Result<PersistedExecutionRun, EngineError> {
-        let mut scheduler = self.scheduler.checkpoint();
-        scheduler.interrupt = None;
-        scheduler.interrupt_pending.clear();
-        if let Some(running) = scheduler.running.as_mut() {
-            running.paused = false;
-        }
+        // Both lanes are accepted work. Preserve their ordering and independent
+        // continuations, including a normal action paused by an override.
+        let scheduler = self.scheduler.checkpoint();
         let active_continuation = self
             .producer
             .frames
@@ -98,14 +95,7 @@ impl RuntimeEngine {
                 run.schema_version, EXECUTION_RUN_SCHEMA_VERSION
             )));
         }
-        let mut scheduler_checkpoint = run.scheduler.clone();
-        let discarded_override = scheduler_checkpoint.interrupt.is_some()
-            || !scheduler_checkpoint.interrupt_pending.is_empty();
-        scheduler_checkpoint.interrupt = None;
-        scheduler_checkpoint.interrupt_pending.clear();
-        if let Some(running) = scheduler_checkpoint.running.as_mut() {
-            running.paused = false;
-        }
+        let scheduler_checkpoint = run.scheduler.clone();
         let scheduler = prayer_scheduler::Scheduler::from_checkpoint(scheduler_checkpoint.clone())
             .map_err(|error| EngineError::InvalidState(error.to_string()))?;
         if let PersistedProducer::Manual(producer) = run.producer {
@@ -140,13 +130,7 @@ impl RuntimeEngine {
         self.queue_claim = producer.claim;
         self.action_sequence = producer.action_sequence;
         self.action_run = None;
-        let active_continuation = if discarded_override {
-            scheduler_checkpoint
-                .running
-                .and_then(|running| running.continuation)
-        } else {
-            run.active_continuation
-        };
+        let active_continuation = run.active_continuation;
         if let Some(continuation) = active_continuation {
             if continuation.executor != "prayer-runtime" {
                 return Err(EngineError::InvalidState(format!(
