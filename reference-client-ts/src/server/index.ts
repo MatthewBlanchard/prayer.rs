@@ -16,6 +16,7 @@ import { SquadStore } from "./squads.js";
 import { registerSquadRoutes } from "./routes/squads.js";
 import { registerRoutingRoutes } from "./routes/routing.js";
 import { discoverPlugins } from "./plugins/registry.js";
+import { registerPrayerProxy } from "./routes/prayer-proxy.js";
 import { FuelWatcher } from "./fuel-watcher.js";
 
 // ---------------------------------------------------------------------------
@@ -23,12 +24,12 @@ import { FuelWatcher } from "./fuel-watcher.js";
 // ---------------------------------------------------------------------------
 
 async function main(): Promise<void> {
-  const { prayerApiUrl, port } = parseArgs();
+  const { prayerApiUrl, prayerApiToken, port } = parseArgs();
   const archivedLegacyJobs = await archiveLegacyJobs(JOBS_PATH);
   if (archivedLegacyJobs) {
     console.warn(`Archived legacy squad conversations at ${archivedLegacyJobs}; they were not converted into executable jobs.`);
   }
-  const prayer = await Prayer.connect({ baseUrl: prayerApiUrl });
+  const prayer = await Prayer.connect({ baseUrl: prayerApiUrl, token: prayerApiToken });
   const fuelWatcher = new FuelWatcher(prayer);
   fuelWatcher.start();
   const sse = new SseHub();
@@ -44,22 +45,18 @@ async function main(): Promise<void> {
     const stableBotIds = squad.botIds.map((id) => fleetIdentities.get(id) ?? id);
     if (stableBotIds.some((id, index) => id !== squad.botIds[index])) await squadStore.update(squad.id, { botIds: stableBotIds });
   }
-  const jobSupervisor = new JobSupervisor(
-    prayer,
-    jobRunStore,
-    (run) => sse.broadcast({ type: "job_run_updated", run }),
-    pluginRegistry,
-  );
+  const jobSupervisor = new JobSupervisor(prayer, jobRunStore, (run) => sse.broadcast({ type: "job_run_updated", run }), pluginRegistry);
   // ---------------------------------------------------------------------------
   // Express app
   // ---------------------------------------------------------------------------
 
   const app = express();
+  registerPrayerProxy(app, { baseUrl: prayerApiUrl, token: prayerApiToken });
   app.use(express.json());
 
   // Serve built frontend in production
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
-  const publicDir = path.join(__dirname, "../public");
+  const publicDir = path.join(__dirname, "../../public");
   app.use(express.static(publicDir));
 
   // SSE endpoint
@@ -93,7 +90,7 @@ async function main(): Promise<void> {
 
   registerSessionRoutes(app);
 
-  registerConfigRoutes(app, { prayerApiUrl });
+  registerConfigRoutes(app);
 
   await jobSupervisor.recover();
   app.listen(port, () => {

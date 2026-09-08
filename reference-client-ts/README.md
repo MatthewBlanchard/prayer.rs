@@ -21,7 +21,10 @@ cargo xtask run --client web
 ```
 
 The Vite frontend runs at `http://127.0.0.1:5173` and proxies API and event
-requests to the Express server on port `3001`.
+requests to the Express server on port `3001`. All browser traffic stays on
+that origin: Express forwards `/api/v1/*` to Prayer, while handling jobs,
+plugins, and `/events` itself. The browser never needs the Prayer address
+or its API token.
 
 To work on this package directly after bootstrap:
 
@@ -38,10 +41,15 @@ Equivalent environment variables and persistence overrides are:
 | Variable                      | Default                                                 |
 | ----------------------------- | ------------------------------------------------------- |
 | `PRAYER_CLIENT_PORT`          | `3001`                                                  |
+| `PRAYER_CLIENT_API_TOKEN`     | Optional upstream bearer token; server only             |
 | `PRAYER_CLIENT_API_URL`       | `http://127.0.0.1:7777`                                 |
 | `PRAYER_CLIENT_JOBS_PATH`     | `.prayer-client-jobs.json` in the working directory     |
 | `PRAYER_CLIENT_JOB_RUNS_PATH` | `.prayer-client-job-runs.json` in the working directory |
 | `PRAYER_CLIENT_SQUADS_PATH`   | `.prayer-client-squads.json` in the working directory   |
+
+Only Express needs network access to `PRAYER_CLIENT_API_URL`. For a remote
+deployment, expose the reference client through an authenticated HTTPS ingress
+and keep Prayer private. The upstream token does not authenticate browser users.
 
 For example:
 

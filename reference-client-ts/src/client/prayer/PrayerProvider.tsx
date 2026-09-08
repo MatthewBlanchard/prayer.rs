@@ -12,7 +12,6 @@ import type {
 } from "./worldSelectors.js";
 import type { GalaxyExplorationData } from "../api.js";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { fetchConfig } from "../api/config.js";
 import { selectBotView, type BotView } from "./selectors.js";
 
 const POLL_MS = 2_000;
@@ -115,8 +114,7 @@ export function PrayerProvider({ children }: { children: ReactNode }) {
     let stopped = false;
     let timer: number | undefined;
     void (async () => {
-      const config = await fetchConfig();
-      const baseUrl = config?.prayerApiUrl?.trim() || window.location.origin;
+      const baseUrl = window.location.origin;
       const connectAndRefresh = async () => {
         try {
           if (!clientRef.current) {

@@ -6,6 +6,7 @@ export const SQUADS_PATH = process.env["PRAYER_CLIENT_SQUADS_PATH"] ?? path.reso
 
 export type ServerArgs = {
   prayerApiUrl: string;
+  prayerApiToken?: string;
   port: number;
 };
 
@@ -24,5 +25,5 @@ export function parseArgs(): ServerArgs {
 
   const prayerApiUrl = get("--prayer-api-url", "PRAYER_CLIENT_API_URL", "http://127.0.0.1:7777");
 
-  return { prayerApiUrl, port };
+  return { prayerApiUrl, prayerApiToken: process.env["PRAYER_CLIENT_API_TOKEN"], port };
 }
