@@ -120,6 +120,14 @@ pub struct FindState {
     pub origin: Option<CommandOrigin>,
 }
 
+/// Identity retained across host I/O; a result may only update this execution.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExecutionToken {
+    lane: Lane,
+    claim: Option<QueueClaim>,
+    envelope: ActionEnvelope,
+}
+
 /// Result submitted back to engine after command execution.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EngineExecutionResult {
@@ -561,6 +569,40 @@ impl RuntimeEngine {
     }
 
     /// Submit command execution result back into runtime.
+    pub fn execution_token(&self) -> Option<ExecutionToken> {
+        let snapshot = self.scheduler.snapshot();
+        let (lane, running) = match snapshot.interrupt {
+            Some(running) => (Lane::Interrupt, running),
+            None => (Lane::Normal, snapshot.running?),
+        };
+        Some(ExecutionToken {
+            lane,
+            claim: if lane == Lane::Normal { snapshot.claim } else { None },
+            envelope: running.envelope,
+        })
+    }
+
+    pub fn owns_execution(&self, token: &ExecutionToken) -> bool {
+        self.execution_token().as_ref() == Some(token)
+    }
+
+    /// Apply a continuation and result only while their original action owns execution.
+    pub fn execute_result_for(
+        &mut self,
+        token: &ExecutionToken,
+        command: &ResolvedAction,
+        continuation: Option<ActiveCommandState>,
+        result: EngineExecutionResult,
+        state: ExecutionReadContext<'_>,
+    ) -> bool {
+        if !self.owns_execution(token) {
+            return false;
+        }
+        self.set_active_command_state(continuation);
+        self.execute_result(command, result, state);
+        true
+    }
+
     pub fn execute_result(
         &mut self,
         command: &ResolvedAction,
@@ -573,9 +615,9 @@ impl RuntimeEngine {
             Lane::Normal
         };
         if result.completed {
-            let _ = self
-                .scheduler
-                .complete(lane, prayer_actions::ActionOutcome::Succeeded);
+            if self.scheduler.complete(lane, prayer_actions::ActionOutcome::Succeeded).is_err() {
+                return;
+            }
         }
         if command.action.eq_ignore_ascii_case("halt") {
             self.halt("halt command");
@@ -604,7 +646,9 @@ impl RuntimeEngine {
                     let drained = self.scheduler.snapshot().pending.is_empty();
                     if drained {
                         if let Some(run) = self.action_run.as_mut() {
-                            run.outcome = Some(ActionBatchOutcome::Succeeded);
+                            if run.outcome.is_none() {
+                                run.outcome = Some(ActionBatchOutcome::Succeeded);
+                            }
                         }
                         if let Some(claim) = self.queue_claim.take() {
                             let _ = self.scheduler.release(&claim);

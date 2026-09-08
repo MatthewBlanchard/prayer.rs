@@ -23,6 +23,7 @@ pub struct SessionHandle {
     pub knowledge_version: u64,
     pub(crate) tax_estimate_cache: Option<CachedTaxEstimate>,
     pub state_refresh_lock: Arc<Mutex<()>>,
+    pub execution_lock: Arc<Mutex<()>>,
     pub last_state_refresh_completed_at: Option<Instant>,
 }
 
@@ -179,6 +180,7 @@ impl SessionHandle {
             knowledge_version: 0,
             tax_estimate_cache: None,
             state_refresh_lock: Arc::new(Mutex::new(())),
+            execution_lock: Arc::new(Mutex::new(())),
             last_state_refresh_completed_at: None,
         }
     }
