@@ -109,7 +109,7 @@ fn prerequisites() -> Result<()> {
 }
 
 fn bootstrap(root: &Path) -> Result<()> {
-    validate_version("cargo", &["--version"], 1, 78, None)?;
+    validate_version("cargo", &["--version"], 1, 98, None)?;
     validate_version("node", &["--version"], 22, 0, None)?;
     validate_version("npm", &["--version"], 10, 0, Some(12))?;
     let sdk = root.join("prayer-sdk-ts");
